@@ -40,7 +40,7 @@ PINECONE = os.environ.get("AIRLOCK_PINECONE", f"{GATEWAY}/pinecone/GcKFwwQUtTfpw
 MODEL = os.environ.get("AIRLOCK_MODEL", "deepseek-v4.1-flash")
 PINECONE_INDEX = "airlock-memory"
 PINECONE_NAMESPACE = "decisions"
-BOX_ROOT_FOLDER = "Airlock"
+BOX_ROOT_FOLDER = os.environ.get("AIRLOCK_BOX_ROOT", "Airlock")  # the connector cannot delete: switch root for a clean demo
 
 # --- chamber (from .env.chamber, deployed to ctrl) ---
 CHAMBER_URL = os.environ.get("AIRLOCK_URL", "")
