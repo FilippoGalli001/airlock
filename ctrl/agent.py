@@ -26,6 +26,8 @@ Tools:
 - run_python(code): runs Python 3 (standard library only, no network, no files outside /work) with the document
   text on stdin. Whenever the document lists amounts and a total, use it to check that they add up, and report
   the result in `arithmetic_ok` (false if they don't; say by how much in `reason`). People get overcharged.
+  Use decimal.Decimal for money (never float) and print a short, readable result such as
+  "items 289.50 vs total 319.50: off by 30.00".
 - submit_extraction(...): your final answer. You must end by calling it exactly once.
 
 Rules for submit_extraction: doc_type from the enum; date = the document's main date (due date for bills,

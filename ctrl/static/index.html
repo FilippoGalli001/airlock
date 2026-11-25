@@ -71,7 +71,7 @@
   @media (prefers-reduced-motion: reduce) { .pulse .dot, .dot.pulse { animation:none; } }
 
   /* ---------- layout ---------- */
-  main { display:grid; grid-template-columns:minmax(300px, 410px) minmax(0,1fr); gap:20px; padding:20px 24px 40px;
+  main { display:grid; grid-template-columns:minmax(300px, 440px) minmax(0,1fr); gap:20px; padding:20px 24px 40px;
          max-width:1760px; margin:0 auto; align-items:start; }
   .panel { background:var(--panel); border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow); min-width:0; }
   .queue-head { padding:14px; border-bottom:1px solid var(--line); display:grid; gap:10px; }
@@ -305,6 +305,10 @@ const editsText = e => Object.entries(e || {}).map(([k, v]) => `${k} → ${v}`).
 const clock = t => { if (!t) return ""; const d = new Date(t * 1000), now = new Date();
   const hm = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
   return d.toDateString() === now.toDateString() ? hm : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + ", " + hm; };
+// queue rows: time today, date otherwise (keeps the file name readable)
+const qclock = t => { if (!t) return ""; const d = new Date(t * 1000);
+  return d.toDateString() === new Date().toDateString() ? d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+    : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }); };
 const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
 let selected = null, lastDetail = "", lastQueue = "", phase = {}, openKeys = { doc: null, keys: new Set() };
 
@@ -360,7 +364,7 @@ function renderState(s) {
         title="#${esc(d.id)} · ${esc(d.name)} · from ${esc(d.source)}">
       <span class="bar4 ${cls.split(" ")[0]}"></span>
       <span class="nm"><span class="n">${esc(d.name)}</span>${tag}</span>
-      <span class="tm">${esc(clock(d.created))}</span>${chip(label, cls)}</button></li>`;
+      <span class="tm">${esc(qclock(d.created))}</span>${chip(label, cls)}</button></li>`;
   }).join("");
   ul.querySelectorAll(".doc").forEach(b => b.onclick = () => select(+b.dataset.id, true));
   if (focusId) { const b = ul.querySelector(`.doc[data-id="${CSS.escape(focusId)}"]`); if (b) b.focus(); }

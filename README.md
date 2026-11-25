@@ -7,7 +7,7 @@ Untrusted documents are opened, OCR'd and analysed inside a disposable, egress-l
 after every single document**. A second Sprite holds the connectors (Ollama, Box, Pinecone) and never opens a
 file. The AI proposes, deterministic code decides, and you approve anything sensitive.
 
-Built for Fly.io Hacksgiving 2026. Demo video: _(link)_
+Built for Fly.io Hacksgiving 2026. Demo video: _(link)_ · Live, read-only: _(link)_
 
 ![Airlock: a paystub waiting for review](docs/review.png)
 
@@ -64,6 +64,8 @@ upload / Box Inbox ─► chamber-1: parse + OCR in a jail ─► agent (Ollama)
 | `service-agreement-v2.pdf` | **QUARANTINE**: the same attack paraphrased; the rule misses it, the model catches it |
 | `receipt-with-javascript.pdf` | **QUARANTINE**: the PDF carries an OpenAction JavaScript |
 | **Red-team drill** | Assume the model was fooled: hostile code runs in the chamber, reads the canary, tries to phone home, write outside `/work` and hide the read → **RED**, nothing leaves, chamber restored in ~5–7 s |
+
+![The agent's code catches an overcharge](docs/invoice.png)
 
 ![Red-team drill](docs/red-team.png)
 

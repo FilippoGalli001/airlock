@@ -273,3 +273,15 @@ QUARANTINE rule+model; **paraphrased injection: rule silent, model flagged it �
 receipt … hidden instructions … ignored them and flagged it"); JavaScript receipt QUARANTINE (JS, JavaScript,
 OpenAction). 44 tests.
 Not done: Weird Uncle angle (agreed it doesn't fit).
+
+### Demo state + real screenshots — Nov 26, after midnight
+- `reset-demo`, then the full set processed on ctrl via the CLI (in video order): bill AUTO; paystub-oct
+  approved with "Acme Software (payroll)" + note; paystub-nov APPROVAL citing the note (Pinecone 0.882);
+  plumber invoice APPROVAL (doesn't add up); vendor contract QUARANTINE rule+model; paraphrased contract
+  QUARANTINE model only; JavaScript receipt QUARANTINE; red-team drill RED. 14 LLM calls.
+- Live screenshots: `sprite proxy -s airlock-ctrl 18080:8080` + headless Chrome (CDP), login by POSTing the form
+  from the page; saved to `docs/{review,invoice,red-team,paraphrase}.png` (README uses three).
+- Agent prompt: use `decimal.Decimal` for money (the bill's check printed 78.39999999999999).
+- Queue: time only for today, date otherwise; column 440 px, so full file names fit.
+- `scripts/public-demo.sh on|off`: toggles `AIRLOCK_PUBLIC_READONLY` in `.env.ctrl`, redeploys, and sets the ctrl
+  URL auth to public/sprite. Plan: turn it on just before submitting (the form asks for a demo link).
