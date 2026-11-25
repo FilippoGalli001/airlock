@@ -1,0 +1,7 @@
+# local Sprite CLI binding (org + sprite name)
+.sprite
+.env
+.venv/
+__pycache__/
+*.pyc
+.env.*
