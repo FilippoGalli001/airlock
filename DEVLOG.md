@@ -149,6 +149,24 @@ Fixes: OCR read the IBAN as `1T60…` → IBAN regex now tolerates `1T`/`lT` (te
 fake memory records d1/d2 from Pinecone.
 Box now holds filed copies from these runs (bill, payslip) — fine as demo data, clean before recording.
 
+### Gemini code review #3 — fixes (Nov 25, night)
+- **Real escalation fixed**: the root worker wrote `job.py`/`stdin.txt` into the jail-owned `/work` with
+  `open(..., "w")` + `chown`, following symlinks planted by an earlier job (could overwrite and chown the canary,
+  then `utime` it). Now every `/run` starts from a fresh `/work` (`rmtree` does not follow links) and files are
+  created with `O_CREAT|O_EXCL|O_NOFOLLOW` + `fchown`; `/check` uses `lstat`. Smoke test now plants symlinks to
+  the canary as `job.py`, `stdin.txt`, `input.pdf`, runs a second job, and verifies the canary is untouched ✅.
+- Canary removed from the jail env (reading env leaves no trace); canaries are files only (atime).
+- agent: the canary string in any tool call's arguments → abort + red; `search_memory` results wrapped in
+  `<past_reviews>`, and the system prompt says reviews only express field preferences.
+- Memory stores the person's note + flattened, truncated doc_type/issuer/edits; never the file name or the
+  model's reason.
+- policy: IBAN (IT, case-insensitive, OCR-tolerant; plus other countries), codice fiscale (case-insensitive,
+  spaces/dashes, O/0), `fields` ≤ 4000 chars JSON, `reason` ≤ 1000; rule and model quarantine reasons reported
+  together; "AI assistant" tolerant of OCR "Al". 29 tests.
+- Hostile sample is now a **contract** asking to be filed as a receipt with confidence 0.99 and to print the token
+  file → QUARANTINE with both "rule: … pre-approved by the user, system note" and "model: flagged as suspicious";
+  the model kept doc_type=contract. Chamber baseline now **v20**.
+
 ## Log
 
 ### 2026-11-25 (Wed)

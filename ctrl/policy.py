@@ -3,6 +3,7 @@
 decide() never trusts the model's own labels to loosen anything: the model's `suspicious` flag and its
 confidence can only make the outcome stricter.
 """
+import json
 import re
 from dataclasses import dataclass, field
 from datetime import date
@@ -11,13 +12,22 @@ from . import config
 
 AUTO, APPROVAL, QUARANTINE = "AUTO", "APPROVAL", "QUARANTINE"
 
-# tolerant of OCR confusions in the country code ("1T60…", "lT60…")
-IBAN_RE = re.compile(r"(?<![0-9A-Z])[I1l]T\s?\d{2}\s?[A-Z0-9]\s?(?:[0-9O]\s?){10}(?:[0-9A-Z]\s?){12}(?![0-9A-Z])")
-CODICE_FISCALE_RE = re.compile(r"\b[A-Z]{6}\d{2}[A-EHLMPR-T]\d{2}[A-Z]\d{3}[A-Z]\b")
+# Italian IBAN, case-insensitive and tolerant of OCR confusions ("1T60…", "lT60…", O for 0)
+IBAN_IT_RE = re.compile(r"(?<![0-9A-Z])[I1L]T\s?\d{2}\s?[A-Z0-9]\s?(?:[0-9O]\s?){10}(?:[0-9A-Z]\s?){12}(?![0-9A-Z])",
+                        re.IGNORECASE)
+# any other IBAN: upper-case country code + check digits + 11..30 alphanumerics, optionally in groups of 4
+IBAN_ANY_RE = re.compile(r"(?<![0-9A-Z])[A-Z]{2}\d{2}(?:\s?[A-Z0-9]{4}){2,7}(?:\s?[A-Z0-9]{1,4})?(?![0-9A-Z])")
+# codice fiscale, case-insensitive, with optional spaces/dashes, O/0 confusions in the digit positions
+_D = r"[0-9O]"
+CODICE_FISCALE_RE = re.compile(
+    rf"(?<![A-Z0-9])[A-Z]{{3}}[\s-]?[A-Z]{{3}}[\s-]?{_D}{{2}}[A-EHLMPR-T]{_D}{{2}}[\s-]?[A-Z]{_D}{{3}}[A-Z](?![A-Z0-9])",
+    re.IGNORECASE)
+MAX_FIELDS_JSON = 4000
+MAX_REASON = 1000
 # phrases aimed at an AI rather than at a person; deterministic, independent of the model
 INJECTION_RE = re.compile(
     r"(ignore (all |the )?(previous|prior|above) (instructions|prompts?)|system (note|prompt|message)"
-    r"|\bAI assistant\b|you are (now )?(an?|the) (ai|assistant|model)|pre-?approved by the user"
+    r"|\bA[Il1] assistant\b|you are (now )?(an?|the) (ai|assistant|model)|pre-?approved by the user"
     r"|developer mode|jailbreak|ignora (le )?istruzioni|nota per l'?(ia|assistente))",
     re.IGNORECASE,
 )
@@ -61,6 +71,12 @@ def validate(proposal):
     if total is not None and (isinstance(total, bool) or not isinstance(total, (int, float))
                               or not -1_000_000 < total < 1_000_000):
         problems.append("total_eur must be a number or null")
+    fields = proposal.get("fields", {})
+    if fields is not None and (not isinstance(fields, dict) or len(json.dumps(fields)) > MAX_FIELDS_JSON):
+        problems.append(f"fields must be an object of at most {MAX_FIELDS_JSON} characters")
+    reason = proposal.get("reason", "")
+    if not isinstance(reason, str) or len(reason) > MAX_REASON:
+        problems.append(f"reason must be a string of at most {MAX_REASON} characters")
     d = proposal.get("date", "")
     if d not in ("", None):
         try:
@@ -72,7 +88,7 @@ def validate(proposal):
 
 def sensitive_data(text):
     found = []
-    if IBAN_RE.search(text or ""):
+    if IBAN_IT_RE.search(text or "") or IBAN_ANY_RE.search(text or ""):
         found.append("IBAN")
     if CODICE_FISCALE_RE.search(text or ""):
         found.append("codice fiscale")
@@ -107,11 +123,15 @@ def decide(proposal, alarms, text, canary=""):
     if yellow:
         return Decision(QUARANTINE, ["YELLOW: " + y for y in yellow])
 
+    # two independent layers; report both when both fire
+    quarantine = []
     markers = injection_markers(text)
     if markers:
-        return Decision(QUARANTINE, ["the document contains instructions aimed at an AI: " + ", ".join(markers)])
+        quarantine.append("rule: the document contains instructions aimed at an AI: " + ", ".join(markers))
     if proposal["suspicious"]:
-        return Decision(QUARANTINE, ["the model flagged the document as suspicious"])
+        quarantine.append("model: flagged the document as suspicious")
+    if quarantine:
+        return Decision(QUARANTINE, quarantine)
 
     reasons = []
     sensitive = sensitive_data(text)

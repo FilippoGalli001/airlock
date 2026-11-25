@@ -87,6 +87,15 @@ except Exception as e: print("utime ->", type(e).__name__)
 print("sudo:", subprocess.run(["sudo", "-n", "id"], capture_output=True, text=True).stderr.strip()[:80])
 print("sprite api:", os.path.exists("/.sprite/api.sock"), "env:", sorted(k for k in os.environ))
 '''
+    # symlink attack: plant links in /work, then a second job; the worker must not follow them as root
+    plant = ("import os\nfor n in ('job.py','stdin.txt','input.pdf'):\n"
+             "    try: os.unlink('/work/'+n)\n    except FileNotFoundError: pass\n"
+             "    os.symlink('/srv/airlock/home/.config/box/token', '/work/'+n)\nprint('planted')")
+    show("symlink plant", call("POST", "/run", {"code": plant, "stdin": ""}))
+    show("second job after plant", call("POST", "/run", {"code": "print('second job ok')", "stdin": "x"}))
+    show("check after symlink attack (canary must be untouched)", call("POST", "/check"))
+    reset()
+
     show("RED TEAM script", call("POST", "/run", {"code": redteam, "stdin": ""}))
     show("check after red team", call("POST", "/check"))
     reset()

@@ -194,10 +194,14 @@ def review(doc_id, action, edits=None, note="", reviewer="you", memory=None, box
         db.event(doc_id, "review", action="approve", edits=edits or {}, note=note, by=reviewer)
         file_out(db.get(doc_id), proposal, box)
         db.update(doc_id, status="filed")
-    changed = ", ".join(f"{k}: {doc['proposal'].get(k)!r} -> {v!r}" for k, v in (edits or {}).items())
-    text = (f"{proposal.get('doc_type')} da {proposal.get('issuer')} ({doc['name']}). "
+    # Memory gets the person's own words plus short, flattened field values — never document-controlled
+    # free text such as the file name or the model's reason, so an approved document cannot poison memory.
+    def flat(v, n=80):
+        return " ".join(str(v).split())[:n]
+    changed = ", ".join(f"{k}: {flat(doc['proposal'].get(k), 60)!r} -> {flat(v, 60)!r}" for k, v in (edits or {}).items())
+    text = (f"{proposal.get('doc_type')} da {flat(proposal.get('issuer'))}. "
             f"La persona ha {'rifiutato' if action == 'reject' else 'approvato'}"
-            f"{' con modifiche: ' + changed if changed else ''}. Nota: {note or '-'}")
+            f"{' con modifiche: ' + changed if changed else ''}. Nota della persona: {flat(note, 400) or '-'}")
     memory.remember(f"doc-{doc_id}", text, action=action, doc_type=proposal.get("doc_type", ""),
                     when=time.strftime("%Y-%m-%d"))
     db.event(doc_id, "remembered", text=text)

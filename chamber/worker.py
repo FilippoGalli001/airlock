@@ -56,7 +56,7 @@ def jail_argv(cmd, timeout_s):
         "--setenv", "PATH", "/usr/bin:/bin",
         "--setenv", "HOME", "/home/jail",
         "--setenv", "LANG", "C.UTF-8",
-        "--setenv", "BOX_TOKEN", CANARY,
+        # no canary in the environment: reading env leaves no trace, so canaries live only in files (atime)
         "--ro-bind", "/usr", "/usr",
         "--ro-bind", "/etc", "/etc",
         "--symlink", "usr/bin", "/bin",
@@ -80,9 +80,20 @@ def jail_argv(cmd, timeout_s):
 
 
 def reset_work():
+    # rmtree does not follow symlinks, so links planted by jailed code are removed, not their targets
     shutil.rmtree(WORK, ignore_errors=True)
     os.makedirs(WORK)
     os.chown(WORK, JAIL_UID, JAIL_UID)
+
+
+def write_for_jail(name, data):
+    """Create a fresh file in WORK for the jail. O_EXCL|O_NOFOLLOW: never follows a planted symlink."""
+    fd = os.open(os.path.join(WORK, name), os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o644)
+    try:
+        os.write(fd, data)
+        os.fchown(fd, JAIL_UID, JAIL_UID)
+    finally:
+        os.close(fd)
 
 
 def run_jailed(cmd, timeout_s, stdin_bytes=b""):
@@ -126,7 +137,9 @@ def check():
     for root, _, files in os.walk(WORK):
         for name in files:
             p = os.path.join(root, name)
-            work_files.append({"path": p.replace(WORK, "/work"), "size": os.path.getsize(p)})
+            st = os.lstat(p)  # never follow links planted by the jail
+            work_files.append({"path": p.replace(WORK, "/work"), "size": st.st_size,
+                               "symlink": os.path.islink(p)})
     home_entries = sorted(os.listdir(JAIL_HOME))
     return {"canaries": canaries, "canary_read": any(c["read"] for c in canaries),
             "work_files": work_files[:50], "home_entries": home_entries}
@@ -183,9 +196,7 @@ class Handler(BaseHTTPRequestHandler):
                 if ext not in ALLOWED_EXT:
                     return self._send(400, {"error": "unsupported extension"})
                 reset_work()
-                with open(os.path.join(WORK, f"input.{ext}"), "wb") as f:
-                    f.write(body)
-                os.chown(os.path.join(WORK, f"input.{ext}"), JAIL_UID, JAIL_UID)
+                write_for_jail(f"input.{ext}", body)
                 res = run_jailed(["/usr/bin/python3", "/airlock/extract.py"], timeout_s=120)
                 try:
                     res["extract"] = json.loads(base64.b64decode(res["stdout_b64"]))
@@ -194,13 +205,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, res)
             if path == "/run":
                 req = json.loads(body)
-                if not os.path.isdir(WORK):
-                    reset_work()
-                for name, data in (("job.py", req.get("code", "")), ("stdin.txt", req.get("stdin", ""))):
-                    p = os.path.join(WORK, name)
-                    with open(p, "w") as f:
-                        f.write(data)
-                    os.chown(p, JAIL_UID, JAIL_UID)
+                reset_work()  # a fresh /work per job: nothing planted by an earlier job survives
+                write_for_jail("job.py", req.get("code", "").encode())
                 return self._send(200, run_jailed(["/usr/bin/python3", "/work/job.py"], timeout_s=20,
                                                   stdin_bytes=req.get("stdin", "").encode()))
             if path == "/check":
