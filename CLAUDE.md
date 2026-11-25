@@ -43,4 +43,5 @@ The AI proposes, the code decides, people approve what is risky.
   (`setup | add FILE | sync | process ID [--redteam] | list | show ID | approve ID --set k=v --note .. | reject ID --note ..`)
 
 ## Status
-See the top of `DEVLOG.md`.
+See the top of `DEVLOG.md`. Checks before any deploy: `python -m unittest discover -s tests -t .`, and
+`node --check` on the `<script>` of `ctrl/static/index.html` (a broken string once blanked the page).

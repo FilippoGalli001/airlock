@@ -13,7 +13,7 @@ from contextlib import contextmanager
 
 from . import agent, config, db, policy
 from .box import Box
-from .chamber import Chamber, merge_alarms
+from .chamber import Chamber, merge_alarms, merge_extract
 from .memory import Memory
 from .policy import Alarms
 
@@ -22,8 +22,33 @@ CHAMBER_LOCK = threading.Lock()
 PHASE = {"step": "idle", "doc": None, "since": time.time()}
 
 
+# Fail closed: if the chamber cannot be brought back to its clean baseline, no document goes in.
+HALT = {"halted": False, "why": ""}
+
+
+class ChamberUnavailable(Exception):
+    pass
+
+
 def phase(step, doc=None):
     PHASE.update(step=step, doc=doc, since=time.time())
+
+
+def ensure_clean(chamber):
+    """The chamber must report a clean baseline before a document goes in; one reset is attempted."""
+    try:
+        h = chamber.health()
+        if h.get("dirty"):
+            chamber.reset()
+            h = chamber.health()
+        if not h.get("ok") or h.get("dirty"):
+            raise ChamberUnavailable("the chamber is not clean after a reset")
+    except ChamberUnavailable:
+        raise
+    except Exception as e:  # noqa: BLE001
+        raise ChamberUnavailable(f"chamber unreachable: {type(e).__name__}") from e
+    HALT.update(halted=False, why="")
+
 EXT_OK = {"pdf", "png", "jpg", "jpeg", "tif", "tiff", "webp", "txt", "csv"}
 FILES = os.path.join(config.DATA_DIR, "files")
 
@@ -109,6 +134,13 @@ def process(doc_id, redteam=None, chamber=None, memory=None, box=None):
         db.event(doc_id, kind, **data)
 
     with CHAMBER_LOCK, keep_awake():
+        try:
+            ensure_clean(chamber)
+        except ChamberUnavailable as e:
+            HALT.update(halted=True, why=str(e))
+            log("chamber_unavailable", error=str(e))
+            db.update(doc_id, status="queued")   # retried once the chamber is clean again
+            return db.get(doc_id)
         db.update(doc_id, status="processing")
         try:
             with open(file_path(doc), "rb") as f:
@@ -117,9 +149,11 @@ def process(doc_id, redteam=None, chamber=None, memory=None, box=None):
             ex = chamber.extract(data, doc["ext"])
             merge_alarms(alarms, job=ex)
             extract = ex.get("extract") or {}
+            merge_extract(alarms, extract)
             text = "\n\n".join(extract.get("pages") or [])
             log("extract", method=extract.get("method"), chars=extract.get("chars"), ms=ex.get("ms"),
-                text=text[:6000], returncode=ex.get("returncode"))
+                text=text[:6000], returncode=ex.get("returncode"), total_pages=extract.get("total_pages"),
+                active_content=extract.get("active_content"), pages_truncated=extract.get("pages_truncated"))
 
             if redteam:
                 job = chamber.run_python(REDTEAM_SCRIPT)
@@ -166,8 +200,9 @@ def process(doc_id, redteam=None, chamber=None, memory=None, box=None):
             try:
                 secs = chamber.reset()
                 log("reset", seconds=secs, checkpoint=chamber.baseline)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # noqa: BLE001 — halt the queue rather than reuse a dirty chamber
                 log("reset_failed", error=str(e)[:300])
+                HALT.update(halted=True, why="the last reset failed")
             phase("idle")
     return db.get(doc_id)
 
@@ -182,7 +217,7 @@ def file_out(doc, proposal, box):
     meta = {"airlock": {"document": doc["id"], "sha256": doc["sha256"], "filed": time.strftime("%Y-%m-%d %H:%M"),
                         "decision": (db.get(doc["id"]) or {}).get("decision")}, **proposal}
     box.upload(folder, f"{stem}.airlock.json", json.dumps(meta, ensure_ascii=False, indent=2).encode())
-    db.event(doc["id"], "filed", folder=config.FOLDERS.get(proposal["doc_type"], "Altro"), box_file_id=fid,
+    db.event(doc["id"], "filed", folder=config.FOLDERS.get(proposal["doc_type"], "Other"), box_file_id=fid,
              box_folder_id=folder)
 
 
@@ -236,7 +271,9 @@ def _remember(doc, doc_id, action, proposal, edits, note, memory):
         return " ".join(str(v).split())[:n]
     changed = ", ".join(f"{k}: {flat(doc['proposal'].get(k), 60)!r} -> {flat(v, 60)!r}"
                         for k, v in (edits or {}).items()) if action == "approve" else ""
-    text = (f"{proposal.get('doc_type')} from {flat(proposal.get('issuer'))}. "
+    # A rejected document's issuer is still the model's reading of attacker-controlled text: don't keep it.
+    who = "" if action == "reject" else f" from {flat(proposal.get('issuer'))}"
+    text = (f"{proposal.get('doc_type')}{who}. "
             f"The person {'rejected it' if action == 'reject' else 'approved it'}"
             f"{' with changes: ' + changed if changed else ''}. The person's note: {flat(note, 400) or '-'}")
     memory.remember(f"doc-{doc_id}", text, action=action, doc_type=proposal.get("doc_type", ""),

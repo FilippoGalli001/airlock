@@ -37,6 +37,8 @@ def valid(token):
 
 def worker_loop():
     while True:
+        if pipeline.HALT["halted"]:          # fail closed: wait, then let process() re-check the chamber
+            time.sleep(20)
         doc_id = db.next_queued()
         if doc_id is None:
             WAKE.wait(timeout=30)
@@ -58,14 +60,13 @@ def summary(d):
 
 
 def state():
-    today = time.strftime("%Y-%m-%d")
-    row = db.db().execute("SELECT llm_calls FROM budget WHERE day=?", (today,)).fetchone()
     return {
         "docs": [summary(d) for d in db.documents(60)],
         "phase": pipeline.PHASE,
         "chamber": {"baseline": config.CHAMBER_BASELINE, "egress": "deny all", "connectors": 0},
         "ctrl": {"connectors": ["Ollama", "Box", "Pinecone"], "model": config.MODEL},
-        "budget": {"llm_calls": row[0] if row else 0, "cap": config.DAILY_LLM_CALLS},
+        "budget": {"llm_calls": db.today_llm_calls(), "cap": config.DAILY_LLM_CALLS},
+        "halt": pipeline.HALT,
     }
 
 
@@ -108,16 +109,18 @@ class Handler(BaseHTTPRequestHandler):
         path = urllib.parse.urlparse(self.path).path
         if path == "/login":
             return self._send(200, self._page("login.html"), "text/html; charset=utf-8")
-        if not self._authed():
+        authed = self._authed()
+        if not (authed or config.PUBLIC_READONLY):
             if path.startswith("/api/"):
                 return self._send(401, {"error": "login required"})
             return self._send(302, b"", extra={"Location": "/login"})
         if path == "/":
             return self._send(200, self._page("index.html"), "text/html; charset=utf-8")
         if path == "/api/state":
-            return self._send(200, state())
+            return self._send(200, {**state(), "viewer": {"signed_in": authed, "public": config.PUBLIC_READONLY}})
         if path.startswith("/api/doc/"):
-            d = db.get(int(path.rsplit("/", 1)[1]))
+            tail = path.rsplit("/", 1)[1]
+            d = db.get(int(tail)) if tail.isdigit() else None
             if not d:
                 return self._send(404, {"error": "not found"})
             return self._send(200, {**d, "events": db.events(d["id"])})
@@ -150,12 +153,17 @@ class Handler(BaseHTTPRequestHandler):
                 WAKE.set()
                 return self._send(200, {"id": doc_id})
             if path.startswith("/api/doc/") and path.endswith(("/approve", "/reject")):
-                doc_id = int(path.split("/")[3])
+                part = path.split("/")[3]
+                if not part.isdigit():
+                    return self._send(404, {"error": "not found"})
+                doc_id = int(part)
                 req = json.loads(self._body(64 * 1024) or b"{}")
                 action = "approve" if path.endswith("/approve") else "reject"
-                edits = {k: v for k, v in (req.get("edits") or {}).items() if v not in (None, "")}
+                # an emptied field is a real edit (e.g. remove a date the model made up)
+                edits = {k: ("" if v is None else v) for k, v in (req.get("edits") or {}).items()}
                 if "total" in edits:
-                    edits["total"] = float(str(edits["total"]).replace(",", "").replace("$", ""))
+                    raw = str(edits["total"]).replace(",", "").replace("$", "").strip()
+                    edits["total"] = float(raw) if raw else None
                 d = pipeline.review(doc_id, action, edits, str(req.get("note", ""))[:1000], background=True)
                 return self._send(200, {"status": d["status"]})
         except ValueError as e:

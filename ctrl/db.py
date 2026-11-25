@@ -8,7 +8,7 @@ from datetime import date
 
 from . import config
 
-_lock = threading.Lock()
+_lock = threading.RLock()  # one shared connection: every read and write goes through it
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS documents (
   id INTEGER PRIMARY KEY, name TEXT NOT NULL, ext TEXT NOT NULL, source TEXT NOT NULL,
@@ -24,6 +24,7 @@ def connect():
     os.makedirs(config.DATA_DIR, exist_ok=True)
     conn = sqlite3.connect(os.path.join(config.DATA_DIR, "airlock.db"), check_same_thread=False)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
     conn.executescript(SCHEMA)
     return conn
 
@@ -57,7 +58,8 @@ def add_document(name, ext, source, sha256, size, box_file_id=None):
 
 
 def known_box_ids():
-    return {r[0] for r in db().execute("SELECT box_file_id FROM documents WHERE box_file_id IS NOT NULL")}
+    with _lock:
+        return {r[0] for r in db().execute("SELECT box_file_id FROM documents WHERE box_file_id IS NOT NULL")}
 
 
 def update(doc_id, **fields):
@@ -79,15 +81,18 @@ def claim(doc_id, from_status, to_status):
 
 
 def get(doc_id):
-    return _row(db().execute("SELECT * FROM documents WHERE id=?", (doc_id,)).fetchone())
+    with _lock:
+        return _row(db().execute("SELECT * FROM documents WHERE id=?", (doc_id,)).fetchone())
 
 
 def documents(limit=100):
-    return [_row(r) for r in db().execute("SELECT * FROM documents ORDER BY id DESC LIMIT ?", (limit,))]
+    with _lock:
+        return [_row(r) for r in db().execute("SELECT * FROM documents ORDER BY id DESC LIMIT ?", (limit,)).fetchall()]
 
 
 def next_queued():
-    r = db().execute("SELECT id FROM documents WHERE status='queued' ORDER BY id LIMIT 1").fetchone()
+    with _lock:
+        r = db().execute("SELECT id FROM documents WHERE status='queued' ORDER BY id LIMIT 1").fetchone()
     return r[0] if r else None
 
 
@@ -98,8 +103,15 @@ def event(doc_id, kind, **data):
 
 
 def events(doc_id):
-    return [{"ts": r["ts"], "kind": r["kind"], **json.loads(r["data"] or "{}")}
-            for r in db().execute("SELECT * FROM events WHERE document_id=? ORDER BY id", (doc_id,))]
+    with _lock:
+        rows = db().execute("SELECT * FROM events WHERE document_id=? ORDER BY id", (doc_id,)).fetchall()
+    return [{"ts": r["ts"], "kind": r["kind"], **json.loads(r["data"] or "{}")} for r in rows]
+
+
+def today_llm_calls():
+    with _lock:
+        r = db().execute("SELECT llm_calls FROM budget WHERE day=?", (date.today().isoformat(),)).fetchone()
+    return r[0] if r else 0
 
 
 def spend_llm_call():

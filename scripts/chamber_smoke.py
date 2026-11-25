@@ -63,7 +63,7 @@ if __name__ == "__main__":
     except urllib.error.HTTPError as e:
         print("   wrong key ->", e.code)
 
-    with open(os.path.join(ROOT, "samples", "bolletta-luce-ottobre.pdf"), "rb") as f:
+    with open(os.path.join(ROOT, "samples", "electric-bill-oct.pdf"), "rb") as f:
         show("extract scanned bill", call("POST", "/extract?ext=pdf", f.read(), "application/octet-stream"))
     show("run_python: check the total", call("POST", "/run", {
         "code": "import sys,re\nt=sys.stdin.read()\nv=[float(x.replace(',','.')) for x in "

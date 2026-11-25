@@ -72,4 +72,13 @@ def merge_alarms(alarms, job=None, check=None):
     return alarms
 
 
-__all__ = ["Chamber", "Alarms", "merge_alarms", "decode"]
+def merge_extract(alarms, extract):
+    """Facts about the file itself, reported by extract.py."""
+    extract = extract or {}
+    alarms.active_content = sorted(set(alarms.active_content) | set(extract.get("active_content") or []))
+    alarms.pages_truncated |= bool(extract.get("pages_truncated"))
+    alarms.text_truncated |= bool(extract.get("text_truncated"))
+    return alarms
+
+
+__all__ = ["Chamber", "Alarms", "merge_alarms", "merge_extract", "decode"]

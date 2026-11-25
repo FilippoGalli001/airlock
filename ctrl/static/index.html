@@ -239,6 +239,12 @@
     .doc { grid-template-columns:4px minmax(0,1fr) auto; }
     .doc .tm { display:none; }
   }
+  /* public read-only view */
+  .signin { display:none; text-decoration:none; }
+  body.readonly .signin { display:inline-flex; align-items:center; }
+  body.readonly #upload, body.readonly #sync, body.readonly #redteam,
+  body.readonly form.review button { display:none; }
+  body.readonly form.review input, body.readonly form.review select, body.readonly form.review textarea { pointer-events:none; opacity:.7; }
 </style>
 </head>
 <body>
@@ -260,6 +266,7 @@
     <div class="state green" id="chamber" role="status" title="Live state of the chamber"><span class="dot"></span><span>CLEAN</span></div>
   </div>
   <div class="net" id="net" hidden>Can't reach airlock-ctrl. Retrying…</div>
+  <div class="net" id="halt" hidden></div>
 </div></header>
 
 <main>
@@ -270,6 +277,7 @@
         <button class="btn primary" id="upload">Upload</button>
         <button class="btn" id="sync">Sync from Box</button>
         <button class="btn danger" id="redteam" title="Assume the LLM was fooled: run hostile code in the chamber">Red-team drill</button>
+        <a class="btn primary signin" href="/login">Sign in to run</a>
       </div>
       <input type="file" id="file" hidden accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.webp,.txt,.csv" multiple>
       <div class="err" id="qerr" role="alert"></div>
@@ -324,6 +332,11 @@ function statusOf(d) {
 const chip = (label, cls) => `<span class="chip ${cls}"><span class="dot"></span>${esc(label)}</span>`;
 
 function renderState(s) {
+  // public read-only view: everyone can look, actions need the password
+  document.body.classList.toggle("readonly", !!(s.viewer && !s.viewer.signed_in));
+  const h = $("#halt");
+  h.hidden = !(s.halt && s.halt.halted);
+  if (!h.hidden) h.textContent = `Queue paused: ${s.halt.why}. No document enters a chamber that isn't clean. Retrying…`;
   $("#baseline").textContent = "baseline " + (s.chamber.baseline || "—");
   phase = s.phase || {};
   const ch = $("#chamber");
@@ -577,6 +590,7 @@ function facts(d) {
     if (f.al.timed_out) f.alYel.push("A chamber job hit its time limit");
     if (f.al.truncated) f.alYel.push("Chamber output was truncated");
     (f.al.blocked || []).forEach(b => f.alYel.push("Blocked by the jail: " + b));
+    if ((f.al.active_content || []).length) f.alYel.push("The PDF carries active content: " + f.al.active_content.join(", "));
   }
   return f;
 }
@@ -598,6 +612,7 @@ function reviewForm(p) {
     <label>Note for the agent (required if you change something or reject)<textarea name="note" placeholder="Why? The agent will remember this next time."></textarea></label>
     <div class="rrow"><button class="btn ok" name="approve" type="submit">Approve and file on Box</button>
       <button class="btn danger" name="reject" type="button">Reject</button>
+      <a class="btn primary signin" href="/login">Sign in to review</a>
       <div class="err" id="rerr" role="alert"></div></div></form>`;
 }
 

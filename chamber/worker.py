@@ -26,7 +26,8 @@ WORK = "/srv/airlock/work"          # bind-mounted at /work inside the jail
 JAIL_HOME = "/srv/airlock/home"     # bind-mounted at /home/jail inside the jail (root-owned canaries)
 STATE = "/srv/airlock/state"        # worker-only state, never mounted in the jail
 DIRTY = os.path.join(STATE, "dirty")
-OUT_CAP = 64 * 1024
+OUT_CAP = 64 * 1024                   # code jobs
+EXTRACT_OUT_CAP = 1024 * 1024         # extract.py caps the text itself; JSON escaping can triple it
 MAX_BODY = 8 * 1024 * 1024           # gateway-sized limit
 ALLOWED_EXT = {"pdf", "png", "jpg", "jpeg", "tif", "tiff", "webp", "txt", "csv"}
 
@@ -44,7 +45,8 @@ JOBS = {"count": 0}
 # stderr fragments that mean "the jail stopped something"
 BLOCKED_MARKERS = (
     "Temporary failure in name resolution", "Name or service not known", "Network is unreachable",
-    "Could not resolve host", "Permission denied", "Read-only file system", "Operation not permitted",
+    "Could not resolve host", "Permission denied", "PermissionError", "Read-only file system",
+    "Operation not permitted",
 )
 
 
@@ -87,17 +89,26 @@ def reset_work():
 
 
 def write_for_jail(name, data):
-    """Create a fresh file in WORK for the jail. O_EXCL|O_NOFOLLOW: never follows a planted symlink."""
-    fd = os.open(os.path.join(WORK, name), os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o644)
+    """Create a fresh file in WORK for the jail: root-owned, read-only (0444), so jailed code can read it but
+    never rewrite it. O_EXCL|O_NOFOLLOW: never follows a planted symlink."""
+    fd = os.open(os.path.join(WORK, name), os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o444)
     try:
         os.write(fd, data)
-        os.fchown(fd, JAIL_UID, JAIL_UID)
     finally:
         os.close(fd)
 
 
-def run_jailed(cmd, timeout_s, stdin_bytes=b""):
-    """Run cmd in the jail; never raises for job failures."""
+def kill_jail_processes():
+    """Nothing the jail started may outlive its job (fork + setsid daemons included)."""
+    subprocess.run(["pkill", "-9", "-u", str(JAIL_UID)], check=False, capture_output=True)
+
+
+def run_jailed(cmd, timeout_s, stdin_bytes=b"", out_cap=OUT_CAP, scan_markers=True):
+    """Run cmd in the jail; never raises for job failures.
+
+    scan_markers: look for "the jail stopped something" messages in the output. Only for code jobs (/run):
+    for /extract the output is the document's own text, which may legitimately say "Permission denied".
+    """
     open(DIRTY, "w").close()
     JOBS["count"] += 1
     t0 = time.time()
@@ -109,21 +120,23 @@ def run_jailed(cmd, timeout_s, stdin_bytes=b""):
             rc = p.returncode
         except subprocess.TimeoutExpired:
             rc = -9
+        finally:
+            kill_jail_processes()
     size_out, size_err = os.path.getsize(out_path), os.path.getsize(err_path)
     with open(out_path, "rb") as f:
-        stdout = f.read(OUT_CAP)
+        stdout = f.read(out_cap)
     with open(err_path, "rb") as f:
-        stderr = f.read(OUT_CAP)
+        stderr = f.read(out_cap)
     text = (stdout + stderr).decode("utf-8", "replace")
     return {
         "returncode": rc,
         "timed_out": rc in (124, 137, -9),
-        "truncated": size_out > OUT_CAP or size_err > OUT_CAP,
+        "truncated": size_out > out_cap or size_err > out_cap,
         "ms": int((time.time() - t0) * 1000),
         "stdout_b64": base64.b64encode(stdout).decode(),
         "stderr_b64": base64.b64encode(stderr).decode(),
         "canary_in_output": CANARY in text,
-        "blocked_markers": sorted({m for m in BLOCKED_MARKERS if m in text}),
+        "blocked_markers": sorted({m for m in BLOCKED_MARKERS if m in text}) if scan_markers else [],
     }
 
 
@@ -197,7 +210,8 @@ class Handler(BaseHTTPRequestHandler):
                     return self._send(400, {"error": "unsupported extension"})
                 reset_work()
                 write_for_jail(f"input.{ext}", body)
-                res = run_jailed(["/usr/bin/python3", "/airlock/extract.py"], timeout_s=120)
+                res = run_jailed(["/usr/bin/python3", "/airlock/extract.py"], timeout_s=120,
+                                 out_cap=EXTRACT_OUT_CAP, scan_markers=False)
                 try:
                     res["extract"] = json.loads(base64.b64decode(res["stdout_b64"]))
                 except ValueError:

@@ -51,3 +51,5 @@ CANARY = os.environ.get("AIRLOCK_CANARY", "")
 # --- ctrl ---
 DATA_DIR = os.environ.get("AIRLOCK_DATA", os.path.expanduser("~/airlock-data"))
 UI_PASSWORD = os.environ.get("AIRLOCK_PASSWORD", "")
+# Anyone with the URL may look (queue + timelines); every action still needs the password.
+PUBLIC_READONLY = os.environ.get("AIRLOCK_PUBLIC_READONLY", "") == "1"

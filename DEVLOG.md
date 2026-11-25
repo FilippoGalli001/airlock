@@ -1,15 +1,11 @@
 # DEVLOG
 
 ## Current status
-- Phase: **spike done except the LLM** (Wed Nov 25 evening). Direction: **Airlock, option B**
-  (`airlock-ctrl` + `chamber-1`).
-- Box, Pinecone, Ollama (deepseek-v4.1-flash, $5 credit) verified through the gateway.
-- ctrl drives the chamber through a key-protected worker on the chamber URL (Custom API to the Sprites API is
-  refused by the gateway).
-- **Chamber done and verified** (baseline v11, red-team smoke test passes).
-- **ctrl pipeline works end to end from the CLI** on airlock-ctrl: all 5 demo cases pass (see log).
-- **Web UI deployed** on airlock-ctrl (service `airlock`, https://airlock-ctrl-jmgx.sprites.app, Fly login + app
-  password from `.env.ctrl`). Next: user tries it; fix UI issues; clean Box/DB for the demo; README; video.
+- Working end to end on two Sprites (airlock-ctrl + chamber-1, baseline v47); UI live at
+  https://airlock-ctrl-jmgx.sprites.app (Fly login + app password; public read-only mode available).
+- README.md and ARCHITECTURE.md match the code. 44 tests.
+- Next: clean demo state (reset-demo + Box Trusted by hand), real screenshots for the README, video (via a
+  skill), social post, submission. User still to delete the unused Custom API connector + revoke its token.
 
 ## Spike checklist (decides the direction)
 Sprite `airlock-spike`, org `filippo-galli`, URL `https://airlock-spike-jmgx.sprites.app` (auth: sprite = private).
@@ -246,3 +242,34 @@ click waited for the in-flight poll. Now a click highlights the row and paints t
 browser cache (prefetched for changed docs on each poll), then refreshes. Verified by rendering the page in
 headless Chrome against the mock (content present), plus `node --check`.
 Data left by the bug: #3 filed 3× on Box (Paystubs) — clean with reset-demo + manual Box cleanup before recording.
+
+### Gemini cold review #4 → fixes — Nov 25–26, night
+Accepted (double-click review was already fixed in the previous round):
+- **Chamber**: files handed to the jail are root-owned 0444 (jail can't rewrite job.py); `pkill -9 -u jail`
+  after every job — `scripts/fork_check.py`: a fork+setsid daemon from job 1 is gone in job 2 (only job 2's own
+  `timeout` parent is listed); block markers only for `/run` (for `/extract` the output is the document's own
+  text: "Permission denied" in a document was a false-positive vector), plus `PermissionError`; extract caps
+  text at 120k chars, reports `total_pages` (pdfinfo), `pages_truncated`, `text_truncated` and active-content
+  keys; `/extract` output cap 1 MB.
+  First active-content scan was a false positive: it matched `/AA` inside a scanned PDF's image stream. Now stream
+  bodies are skipped (`tests/test_extract.py` guards both ways). Baseline now **v47**.
+- **Pipeline fail-closed**: `/health` must be clean before a document goes in (one reset attempt); otherwise the
+  doc returns to the queue, `HALT` is set, the worker loop backs off 20 s and the UI shows "Queue paused".
+  A failed reset also halts. `tests/test_pipeline.py`.
+- **Policy**: SSN with spaces, ACH/wire, payment cards (Luhn), active content → yellow, partial read → APPROVAL,
+  `arithmetic_ok: false` → APPROVAL (new optional field the agent fills after checking sums with run_python).
+- **Server**: all SQLite reads under the (now reentrant) lock + WAL; `/api/doc/<non-int>` → 404; emptied review
+  fields are real edits (remove a made-up date/total); rejected docs don't store the issuer in memory;
+  `deploy-ctrl.sh` restarts the service; public read-only mode `AIRLOCK_PUBLIC_READONLY=1` (GET without cookie,
+  every POST still needs the password; UI hides actions, shows "Sign in to run").
+- **Samples**: realistic layout (header band, meta block, right-aligned amounts); new `plumber-invoice.pdf`
+  (items $289.50 vs $319.50 billed), `service-agreement-v2.pdf` (paraphrased injection),
+  `receipt-with-javascript.pdf` (hand-built text PDF with an OpenAction JavaScript alert).
+- **Docs**: `README.md` written; `ARCHITECTURE.md` rewritten to match the code; smoke test path fixed; "Altro"
+  leftover fixed.
+Results on the live system (reset-demo, then each sample): bill AUTO (arithmetic_ok true); paystub APPROVAL;
+**plumber invoice APPROVAL "the line items do not add up"** (the model also typed it `other`); vendor contract
+QUARANTINE rule+model; **paraphrased injection: rule silent, model flagged it → QUARANTINE** ("not a paid
+receipt … hidden instructions … ignored them and flagged it"); JavaScript receipt QUARANTINE (JS, JavaScript,
+OpenAction). 44 tests.
+Not done: Weird Uncle angle (agreed it doesn't fit).

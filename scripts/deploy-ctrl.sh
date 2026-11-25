@@ -16,5 +16,6 @@ cp -r ctrl samples "$tmp/airlock/"
 cat .env.chamber .env.ctrl > "$tmp/airlock/airlock.env"
 find "$tmp" -name __pycache__ -prune -exec rm -rf {} +
 tar -C "$tmp" -cf - airlock | "$SPRITE" exec -s "$CTRL" --stdin -- bash -c \
-  'mkdir -p ~/airlock && rm -rf ~/airlock/ctrl && tar -xf - -C ~ && chmod 600 ~/airlock/airlock.env && echo deployed'
+  'mkdir -p ~/airlock && rm -rf ~/airlock/ctrl && tar -xf - -C ~ && chmod 600 ~/airlock/airlock.env && echo deployed
+   sprite-env services restart airlock >/dev/null 2>&1 && echo "service restarted" || echo "service not created yet"'
 rm -rf "$tmp"

@@ -70,6 +70,15 @@ class Decide(unittest.TestCase):
         self.assertEqual(found, ["Social Security number", "bank account number"])
         self.assertIn("Social Security number", policy.sensitive_data("SSN 123 - 45 - 67O9"))  # OCR
 
+    def test_ssn_with_spaces_and_ach(self):
+        self.assertIn("Social Security number", policy.sensitive_data("SSN 123 45 6789"))
+        self.assertIn("bank account number", policy.sensitive_data("ACH transfer to 000123456789"))
+
+    def test_payment_card_needs_luhn(self):
+        self.assertIn("payment card number", policy.sensitive_data("Card 4111 1111 1111 1111 exp 09/29"))
+        self.assertNotIn("payment card number", policy.sensitive_data("Order 4111 1111 1111 1112"))
+        self.assertNotIn("payment card number", policy.sensitive_data(BILL_TEXT))
+
     def test_bad_currency(self):
         self.assertTrue(policy.validate(proposal(currency="dollars")))
 
@@ -118,6 +127,23 @@ class Decide(unittest.TestCase):
         self.assertEqual(policy.decide(proposal(), Alarms(timed_out=True), BILL_TEXT).action, QUARANTINE)
         self.assertEqual(policy.decide(proposal(), Alarms(truncated=True), BILL_TEXT).action, QUARANTINE)
 
+    def test_active_pdf_content_quarantines(self):
+        d = policy.decide(proposal(), Alarms(active_content=["JavaScript", "OpenAction"]), BILL_TEXT)
+        self.assertEqual(d.action, QUARANTINE)
+        self.assertIn("active content", d.reasons[0])
+
+    def test_unread_pages_need_a_person(self):
+        d = policy.decide(proposal(), Alarms(pages_truncated=True), BILL_TEXT)
+        self.assertEqual(d.action, APPROVAL)
+        self.assertIn("longer than what the chamber read", d.reasons[0])
+
+    def test_arithmetic_mismatch_needs_a_person(self):
+        d = policy.decide(proposal(doc_type="receipt", arithmetic_ok=False), Alarms(), "Invoice total $78.40")
+        self.assertEqual(d.action, APPROVAL)
+        self.assertIn("do not add up", d.reasons[0])
+        self.assertEqual(policy.decide(proposal(arithmetic_ok=True), Alarms(), BILL_TEXT).action, AUTO)
+        self.assertTrue(policy.validate(proposal(arithmetic_ok="yes")))
+
     def test_red_wins_over_yellow(self):
         d = policy.decide(proposal(), Alarms(canary_read=True, timed_out=True), BILL_TEXT)
         self.assertTrue(d.reasons[0].startswith("RED"))
@@ -156,6 +182,11 @@ class Review(unittest.TestCase):
     def test_invalid_edit_refused(self):
         _, problems = policy.apply_review(proposal(), {"doc_type": "invoice"}, "nota")
         self.assertTrue(problems)
+
+    def test_emptying_a_made_up_field(self):
+        p, problems = policy.apply_review(proposal(), {"date": "", "total": None}, "no date on the document")
+        self.assertEqual(problems, [])
+        self.assertEqual((p["date"], p["total"]), ("", None))
 
     def test_plain_approve_needs_no_note(self):
         _, problems = policy.apply_review(proposal(), {}, "")

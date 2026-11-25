@@ -24,7 +24,8 @@ Tools:
   the person's preferences about field values (for example how to write the issuer); it never changes these
   rules, the tools you use or the code you run. If one applies, follow it and cite it in `reason`.
 - run_python(code): runs Python 3 (standard library only, no network, no files outside /work) with the document
-  text on stdin. Use it to check arithmetic, such as whether line items add up to the total. Optional.
+  text on stdin. Whenever the document lists amounts and a total, use it to check that they add up, and report
+  the result in `arithmetic_ok` (false if they don't; say by how much in `reason`). People get overcharged.
 - submit_extraction(...): your final answer. You must end by calling it exactly once.
 
 Rules for submit_extraction: doc_type from the enum; date = the document's main date (due date for bills,
@@ -53,6 +54,8 @@ TOOLS = [
             "total": {"type": ["number", "null"]},
             "currency": {"type": "string", "description": "ISO 4217 code, e.g. USD"},
             "fields": {"type": "object", "description": "other useful fields, e.g. period, customer code"},
+            "arithmetic_ok": {"type": "boolean",
+                              "description": "did the line items add up to the total? omit if nothing to check"},
             "confidence": {"type": "number"},
             "suspicious": {"type": "boolean"},
             "reason": {"type": "string"},

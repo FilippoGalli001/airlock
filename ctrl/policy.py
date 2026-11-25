@@ -23,10 +23,12 @@ CODICE_FISCALE_RE = re.compile(
     rf"(?<![A-Z0-9])[A-Z]{{3}}[\s-]?[A-Z]{{3}}[\s-]?{_D}{{2}}[A-EHLMPR-T]{_D}{{2}}[\s-]?[A-Z]{_D}{{3}}[A-Z](?![A-Z0-9])",
     re.IGNORECASE)
 # US Social Security number, tolerant of OCR (O for 0, spaces around dashes)
-SSN_RE = re.compile(r"(?<![0-9O])[0-9O]{3}\s?-\s?[0-9O]{2}\s?-\s?[0-9O]{4}(?![0-9O])")
+SSN_RE = re.compile(r"(?<![0-9O])[0-9O]{3}(?:\s?-\s?|\s)[0-9O]{2}(?:\s?-\s?|\s)[0-9O]{4}(?![0-9O])")
 # US bank details: needs banking context (a utility "Account: 4402-118-735" is not a bank account)
-BANK_RE = re.compile(r"\b(routing|ABA|bank account|direct deposit|checking|savings)\b[^\n]{0,40}?\d{6,17}",
+BANK_RE = re.compile(r"\b(routing|ABA|bank account|direct deposit|checking|savings|ACH|wire)\b[^\n]{0,40}?\d{6,17}",
                      re.IGNORECASE)
+# payment card candidates: 13-19 digits, optionally grouped; confirmed with the Luhn checksum
+CARD_RE = re.compile(r"(?<!\d)(?:\d[ -]?){12,18}\d(?!\d)")
 MAX_FIELDS_JSON = 4000
 MAX_REASON = 1000
 # phrases aimed at an AI rather than at a person; deterministic, independent of the model
@@ -46,6 +48,10 @@ class Alarms:
     timed_out: bool = False
     truncated: bool = False
     blocked: list = field(default_factory=list)   # stderr markers such as "Network is unreachable"
+    # from the extraction (facts about the file, not about the code)
+    active_content: list = field(default_factory=list)  # PDF features such as JavaScript, OpenAction, Launch
+    pages_truncated: bool = False                       # more pages than the chamber read
+    text_truncated: bool = False                        # more text than was sent to the model
 
 
 @dataclass
@@ -67,6 +73,8 @@ def validate(proposal):
     conf = proposal.get("confidence")
     if isinstance(conf, bool) or not isinstance(conf, (int, float)) or not 0 <= conf <= 1:
         problems.append("confidence must be a number between 0 and 1")
+    if proposal.get("arithmetic_ok") not in (None, True, False):
+        problems.append("arithmetic_ok must be true, false or absent")
     if not isinstance(proposal.get("suspicious"), bool):
         problems.append("suspicious must be true or false")
     issuer = proposal.get("issuer")
@@ -94,6 +102,24 @@ def validate(proposal):
     return problems
 
 
+def luhn_ok(digits):
+    total, alt = 0, False
+    for ch in reversed(digits):
+        d = int(ch)
+        if alt:
+            d = d * 2 - 9 if d > 4 else d * 2
+        total, alt = total + d, not alt
+    return total % 10 == 0
+
+
+def has_card_number(text):
+    for m in CARD_RE.finditer(text):
+        digits = re.sub(r"\D", "", m.group(0))
+        if 13 <= len(digits) <= 19 and len(set(digits)) > 1 and luhn_ok(digits):
+            return True
+    return False
+
+
 def sensitive_data(text):
     text = text or ""
     found = []
@@ -105,6 +131,8 @@ def sensitive_data(text):
         found.append("IBAN")
     if CODICE_FISCALE_RE.search(text):
         found.append("Italian tax ID")
+    if has_card_number(text):
+        found.append("payment card number")
     return found
 
 
@@ -133,6 +161,8 @@ def decide(proposal, alarms, text, canary=""):
         yellow.append("chamber output was truncated")
     if alarms.blocked:
         yellow.append("the jail blocked: " + ", ".join(alarms.blocked))
+    if alarms.active_content:
+        yellow.append("the PDF contains active content: " + ", ".join(alarms.active_content))
     if yellow:
         return Decision(QUARANTINE, ["YELLOW: " + y for y in yellow])
 
@@ -147,6 +177,10 @@ def decide(proposal, alarms, text, canary=""):
         return Decision(QUARANTINE, quarantine)
 
     reasons = []
+    if alarms.pages_truncated or alarms.text_truncated:
+        reasons.append("the document is longer than what the chamber read; a person must check the rest")
+    if proposal.get("arithmetic_ok") is False:
+        reasons.append("the line items do not add up to the total (checked by code in the chamber)")
     sensitive = sensitive_data(text)
     if sensitive:
         reasons.append("contains sensitive data: " + ", ".join(sensitive))
