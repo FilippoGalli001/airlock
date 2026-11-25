@@ -22,6 +22,11 @@ _D = r"[0-9O]"
 CODICE_FISCALE_RE = re.compile(
     rf"(?<![A-Z0-9])[A-Z]{{3}}[\s-]?[A-Z]{{3}}[\s-]?{_D}{{2}}[A-EHLMPR-T]{_D}{{2}}[\s-]?[A-Z]{_D}{{3}}[A-Z](?![A-Z0-9])",
     re.IGNORECASE)
+# US Social Security number, tolerant of OCR (O for 0, spaces around dashes)
+SSN_RE = re.compile(r"(?<![0-9O])[0-9O]{3}\s?-\s?[0-9O]{2}\s?-\s?[0-9O]{4}(?![0-9O])")
+# US bank details: needs banking context (a utility "Account: 4402-118-735" is not a bank account)
+BANK_RE = re.compile(r"\b(routing|ABA|bank account|direct deposit|checking|savings)\b[^\n]{0,40}?\d{6,17}",
+                     re.IGNORECASE)
 MAX_FIELDS_JSON = 4000
 MAX_REASON = 1000
 # phrases aimed at an AI rather than at a person; deterministic, independent of the model
@@ -67,10 +72,13 @@ def validate(proposal):
     issuer = proposal.get("issuer")
     if not isinstance(issuer, str) or not issuer.strip() or len(issuer) > 200:
         problems.append("issuer must be a non-empty string of at most 200 characters")
-    total = proposal.get("total_eur")
+    total = proposal.get("total")
     if total is not None and (isinstance(total, bool) or not isinstance(total, (int, float))
                               or not -1_000_000 < total < 1_000_000):
-        problems.append("total_eur must be a number or null")
+        problems.append("total must be a number or null")
+    currency = proposal.get("currency", "")
+    if currency not in ("", None) and not (isinstance(currency, str) and re.fullmatch(r"[A-Z]{3}", currency)):
+        problems.append("currency must be a 3-letter ISO code such as USD or EUR")
     fields = proposal.get("fields", {})
     if fields is not None and (not isinstance(fields, dict) or len(json.dumps(fields)) > MAX_FIELDS_JSON):
         problems.append(f"fields must be an object of at most {MAX_FIELDS_JSON} characters")
@@ -87,11 +95,16 @@ def validate(proposal):
 
 
 def sensitive_data(text):
+    text = text or ""
     found = []
-    if IBAN_IT_RE.search(text or "") or IBAN_ANY_RE.search(text or ""):
+    if SSN_RE.search(text):
+        found.append("Social Security number")
+    if BANK_RE.search(text):
+        found.append("bank account number")
+    if IBAN_IT_RE.search(text) or IBAN_ANY_RE.search(text):
         found.append("IBAN")
-    if CODICE_FISCALE_RE.search(text or ""):
-        found.append("codice fiscale")
+    if CODICE_FISCALE_RE.search(text):
+        found.append("Italian tax ID")
     return found
 
 

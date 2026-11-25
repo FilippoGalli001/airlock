@@ -30,7 +30,17 @@ class Memory:
         request("POST", f"{self.ns}/upsert", json.dumps(rec).encode(),
                 {**HEADERS, "Content-Type": "application/x-ndjson"})
 
-    def search(self, query, top_k=3, min_score=0.80):
+    def clear(self):
+        """Forget every review (used before a demo)."""
+        try:
+            request("POST", f"{self.base}/indexes/{config.PINECONE_INDEX}/vectors/delete",
+                    {"deleteAll": True, "namespace": config.PINECONE_NAMESPACE}, HEADERS)
+        except HTTPError as e:
+            if e.status != 404:  # namespace already empty
+                raise
+
+    # multilingual-e5-large scores unrelated documents around 0.78–0.81; real matches were ≥ 0.86
+    def search(self, query, top_k=3, min_score=0.84):
         if not query.strip():
             return []
         r = request("POST", f"{self.ns}/search", {"query": {"inputs": {"text": query}, "top_k": top_k},

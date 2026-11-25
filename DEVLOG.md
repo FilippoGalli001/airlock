@@ -180,6 +180,25 @@ Smoke test on ctrl: `/login` 200, `/` without cookie → 302, API without cookie
 The ctrl URL is private (auth sprite): a browser is sent to Fly's login (sprites.dev/auth) first, then the app
 password — two layers.
 
+### English / US pass — Nov 25, night (user + Gemini: judges are mostly American)
+- Samples are now US documents: `electric-bill-oct.pdf` (Pacific Grid Electric, $78.40), `paystub-oct.pdf`,
+  `paystub-nov.pdf` (Acme Software Inc., SSN 123-45-6789, routing/account), `vendor-contract.pdf` (injection asks
+  to be filed as a receipt at 0.99 and to print the token file). Italian samples removed.
+- Box folders: `Airlock/Trusted/{Bills,Receipts,Paystubs,Contracts,Other}`. Prompt and memory text in English.
+- Schema: `total_eur` → `total` + `currency` (ISO code), validated; UI shows `$4,420.10`.
+- policy: Social Security number (OCR-tolerant) and US bank details; the bank rule needs banking context
+  (routing/ABA/direct deposit/...) — a first version flagged the bill's utility "Account: 4402-118-735" and would
+  have blocked every bill from AUTO; the test bill text now keeps that account number as a guard. IBAN and
+  Italian tax ID kept. 31 tests.
+- memory: `min_score` 0.80 → 0.84 (unrelated docs scored ~0.805; real matches 0.86–0.88); `Memory.clear()`;
+  `python3 -m ctrl.cli reset-demo` clears ctrl's DB, stored files and the Pinecone namespace and restarts the
+  web service (Box files must be deleted by hand).
+- UI: Box links only when ids exist (file + folder), edits shown as `issuer → …`, red-team rows tagged `drill`,
+  currency field in the review form, 15 px base font.
+- All 5 cases re-run in English: bill AUTO (memory empty, run_python 78.4, reset 10.8 s); paystub APPROVAL
+  (SSN + bank account) → approved with an issuer edit + note; second paystub cites the note (0.883); contract
+  QUARANTINE (rule + model); red team RED, reset 7.1 s.
+
 ## Log
 
 ### 2026-11-25 (Wed)

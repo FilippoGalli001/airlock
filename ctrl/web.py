@@ -145,7 +145,7 @@ class Handler(BaseHTTPRequestHandler):
                 WAKE.set()
                 return self._send(200, {"queued": ids})
             if path == "/api/redteam":
-                with open(os.path.join(HERE, "..", "samples", "bolletta-luce-ottobre.pdf"), "rb") as f:
+                with open(os.path.join(HERE, "..", "samples", "electric-bill-oct.pdf"), "rb") as f:
                     doc_id = pipeline.intake("red-team-drill.pdf", f.read(), source="redteam")
                 WAKE.set()
                 return self._send(200, {"id": doc_id})
@@ -154,8 +154,8 @@ class Handler(BaseHTTPRequestHandler):
                 req = json.loads(self._body(64 * 1024) or b"{}")
                 action = "approve" if path.endswith("/approve") else "reject"
                 edits = {k: v for k, v in (req.get("edits") or {}).items() if v not in (None, "")}
-                if "total_eur" in edits:
-                    edits["total_eur"] = float(str(edits["total_eur"]).replace(",", "."))
+                if "total" in edits:
+                    edits["total"] = float(str(edits["total"]).replace(",", "").replace("$", ""))
                 d = pipeline.review(doc_id, action, edits, str(req.get("note", ""))[:1000])
                 return self._send(200, {"status": d["status"]})
         except ValueError as e:

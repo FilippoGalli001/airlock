@@ -1,6 +1,7 @@
 """Command line for running the pipeline on ctrl without the UI.
 
   python -m ctrl.cli setup                     create Box folders and the Pinecone index
+  python -m ctrl.cli reset-demo                clear ctrl's database and the Pinecone memory
   python -m ctrl.cli add FILE [FILE...]        queue local files
   python -m ctrl.cli sync                      queue new files from Box Airlock/Inbox
   python -m ctrl.cli process ID [--redteam]    run one document through the airlock
@@ -44,6 +45,19 @@ def main():
         print(json.dumps(Box().layout(), indent=1))
         Memory().ensure_index()
         print("pinecone index ok")
+    elif a.cmd == "reset-demo":
+        # empties ctrl's own state and the Pinecone memory; Box files must be deleted by hand
+        # (the Box connector cannot delete)
+        import shutil
+        from . import config
+        Memory().clear()
+        if db.CONN is not None:
+            db.CONN.close()
+            db.CONN = None
+        shutil.rmtree(config.DATA_DIR, ignore_errors=True)
+        import subprocess  # the web service holds the old database open
+        subprocess.run(["/.sprite/bin/sprite-env", "services", "restart", "airlock"], capture_output=True, check=False)
+        print("ctrl database, stored files and Pinecone memory cleared; delete Box Airlock/Trusted/* by hand")
     elif a.cmd == "add":
         for p in a.args:
             with open(p, "rb") as f:
@@ -62,7 +76,7 @@ def main():
         edits = {}
         for kv in a.set:
             k, v = kv.split("=", 1)
-            edits[k] = float(v) if k == "total_eur" else v
+            edits[k] = float(v) if k == "total" else v
         pipeline.review(int(a.args[0]), a.cmd, edits, a.note)
         show(int(a.args[0]))
     else:

@@ -212,9 +212,9 @@ def review(doc_id, action, edits=None, note="", reviewer="you", memory=None, box
     def flat(v, n=80):
         return " ".join(str(v).split())[:n]
     changed = ", ".join(f"{k}: {flat(doc['proposal'].get(k), 60)!r} -> {flat(v, 60)!r}" for k, v in (edits or {}).items())
-    text = (f"{proposal.get('doc_type')} da {flat(proposal.get('issuer'))}. "
-            f"La persona ha {'rifiutato' if action == 'reject' else 'approvato'}"
-            f"{' con modifiche: ' + changed if changed else ''}. Nota della persona: {flat(note, 400) or '-'}")
+    text = (f"{proposal.get('doc_type')} from {flat(proposal.get('issuer'))}. "
+            f"The person {'rejected it' if action == 'reject' else 'approved it'}"
+            f"{' with changes: ' + changed if changed else ''}. The person's note: {flat(note, 400) or '-'}")
     memory.remember(f"doc-{doc_id}", text, action=action, doc_type=proposal.get("doc_type", ""),
                     when=time.strftime("%Y-%m-%d"))
     db.event(doc_id, "remembered", text=text)

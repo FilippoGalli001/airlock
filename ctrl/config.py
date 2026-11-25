@@ -14,15 +14,15 @@ if os.path.exists(_ENV_FILE):
 DOC_TYPES = ("utility_bill", "receipt", "payslip", "contract", "other")
 AUTO_TYPES = ("utility_bill", "receipt")      # the only types that may be filed without a person
 MIN_CONFIDENCE = 0.85
-EDITABLE_FIELDS = ("doc_type", "issuer", "date", "total_eur")
+EDITABLE_FIELDS = ("doc_type", "issuer", "date", "total", "currency")
 
 # doc_type -> folder name under Airlock/Trusted on Box (folders are created once; ids are looked up)
 FOLDERS = {
-    "utility_bill": "Bollette",
-    "receipt": "Ricevute",
-    "payslip": "Buste paga",
-    "contract": "Contratti",
-    "other": "Altro",
+    "utility_bill": "Bills",
+    "receipt": "Receipts",
+    "payslip": "Paystubs",
+    "contract": "Contracts",
+    "other": "Other",
 }
 
 # --- budgets ---

@@ -4,7 +4,9 @@ import unittest
 from ctrl import policy
 from ctrl.policy import AUTO, APPROVAL, QUARANTINE, Alarms
 
-BILL_TEXT = "ENERGIA ITALIA S.p.A. - Bolletta luce\nTotale da pagare: 78,40 EUR\nScadenza: 20/11/2026"
+# keeps a utility account number on purpose: it must not count as a bank account
+BILL_TEXT = ("PACIFIC GRID ELECTRIC - Monthly Statement\nCustomer: Jordan Miller   Account: 4402-118-735\n"
+             "Amount due: $78.40\nDue date: Nov 20, 2026")
 PAYSLIP_TEXT = ("ACME SOFTWARE S.r.l. - Cedolino paga\nCodice fiscale: RSSMRA85T10F205X\n"
                 "Accredito su IBAN IT60X0542811101000000123456")
 HOSTILE_TEXT = ("FERRAMENTA BIANCHI - Ricevuta n. 448\nTotale: 12,50 EUR\n"
@@ -12,8 +14,8 @@ HOSTILE_TEXT = ("FERRAMENTA BIANCHI - Ricevuta n. 448\nTotale: 12,50 EUR\n"
 
 
 def proposal(**over):
-    p = {"doc_type": "utility_bill", "issuer": "ENERGIA ITALIA S.p.A.", "date": "2026-11-20",
-         "total_eur": 78.4, "confidence": 0.95, "suspicious": False, "reason": "bill"}
+    p = {"doc_type": "utility_bill", "issuer": "Pacific Grid Electric", "date": "2026-11-20",
+         "total": 78.4, "currency": "USD", "confidence": 0.95, "suspicious": False, "reason": "bill"}
     p.update(over)
     return p
 
@@ -46,9 +48,9 @@ class Decide(unittest.TestCase):
 
     def test_lowercase_and_spaced_identifiers_detected(self):
         self.assertIn("IBAN", policy.sensitive_data("iban it60x0542811101000000123456"))
-        self.assertIn("codice fiscale", policy.sensitive_data("cf: rssmra85t10f205x"))
-        self.assertIn("codice fiscale", policy.sensitive_data("CF RSS MRA 85T10 F205X"))
-        self.assertIn("codice fiscale", policy.sensitive_data("CF RSSMRA85T1OF2O5X"))  # OCR O for 0
+        self.assertIn("Italian tax ID", policy.sensitive_data("cf: rssmra85t10f205x"))
+        self.assertIn("Italian tax ID", policy.sensitive_data("CF RSS MRA 85T10 F205X"))
+        self.assertIn("Italian tax ID", policy.sensitive_data("CF RSSMRA85T1OF2O5X"))  # OCR O for 0
 
     def test_foreign_iban_detected(self):
         self.assertIn("IBAN", policy.sensitive_data("Pay to DE89 3704 0044 0532 0130 00"))
@@ -56,11 +58,20 @@ class Decide(unittest.TestCase):
 
     def test_no_false_positives_on_ordinary_text(self):
         for text in (BILL_TEXT, "Codice cliente: 00412345 Periodo: 01/10/2026 - 31/10/2026",
+                     "Service period: Oct 1, 2026 - Oct 31, 2026. Call 555-123-4567. Date 2026-11-20",
                      "Viti 4x40 (x100) 6,50 Tasselli 8mm (x50) 6,00", "Ricevuta n. 448 del 03/11/2026"):
             self.assertEqual(policy.sensitive_data(text), [], text)
 
     def test_codice_fiscale_detected(self):
-        self.assertEqual(policy.sensitive_data(PAYSLIP_TEXT), ["IBAN", "codice fiscale"])
+        self.assertEqual(policy.sensitive_data(PAYSLIP_TEXT), ["IBAN", "Italian tax ID"])
+
+    def test_us_paystub_identifiers_detected(self):
+        found = policy.sensitive_data("SSN: 123-45-6789\nDirect deposit: routing 021000021  account 000123456789")
+        self.assertEqual(found, ["Social Security number", "bank account number"])
+        self.assertIn("Social Security number", policy.sensitive_data("SSN 123 - 45 - 67O9"))  # OCR
+
+    def test_bad_currency(self):
+        self.assertTrue(policy.validate(proposal(currency="dollars")))
 
     def test_low_confidence_needs_a_person(self):
         d = policy.decide(proposal(confidence=0.6), Alarms(), BILL_TEXT)
@@ -119,13 +130,13 @@ class Validate(unittest.TestCase):
 
     def test_bad_shapes(self):
         bad = [proposal(confidence=1.5), proposal(confidence=True), proposal(suspicious="no"),
-               proposal(issuer=""), proposal(issuer="x" * 201), proposal(total_eur="78,40"),
+               proposal(issuer=""), proposal(issuer="x" * 201), proposal(total="78.40"),
                proposal(date="20/11/2026"), "not a dict"]
         for p in bad:
             self.assertTrue(policy.validate(p), p)
 
     def test_empty_date_and_null_total_are_fine(self):
-        self.assertEqual(policy.validate(proposal(date="", total_eur=None)), [])
+        self.assertEqual(policy.validate(proposal(date="", total=None, currency="")), [])
 
 
 class Review(unittest.TestCase):
