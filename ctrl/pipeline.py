@@ -186,36 +186,59 @@ def file_out(doc, proposal, box):
              box_folder_id=folder)
 
 
-def review(doc_id, action, edits=None, note="", reviewer="you", memory=None, box=None):
-    """A person approves (optionally with edits) or rejects a document awaiting approval."""
+def review(doc_id, action, edits=None, note="", reviewer="you", memory=None, box=None, background=False):
+    """A person approves (optionally with edits) or rejects a document awaiting approval.
+
+    Validates first, then claims the document atomically (awaiting_approval -> filing), so a double click or
+    two browsers can never review it twice. With background=True the slow part (Box upload, Pinecone) runs in
+    a thread and the caller gets an answer at once; the document shows as "filing" meanwhile.
+    """
     doc = db.get(doc_id)
-    if doc["status"] != "awaiting_approval":
-        raise ValueError("this document is not awaiting approval")
-    memory, box = memory or Memory(), box or Box()
+    if not doc or doc["status"] != "awaiting_approval":
+        raise ValueError("this document is not awaiting approval (already reviewed?)")
     if action == "reject":
         if not note.strip():
             raise ValueError("a rejection needs a note")
-        db.update(doc_id, status="rejected", review={"action": "reject", "note": note, "by": reviewer})
-        db.event(doc_id, "review", action="reject", note=note, by=reviewer)
         proposal = doc["proposal"] or {}
     else:
         proposal, problems = policy.apply_review(doc["proposal"], edits, note)
         if problems:
             raise ValueError("; ".join(problems))
-        db.update(doc_id, proposal=proposal, review={"action": "approve", "edits": edits or {}, "note": note,
-                                                     "by": reviewer})
-        db.event(doc_id, "review", action="approve", edits=edits or {}, note=note, by=reviewer)
-        file_out(db.get(doc_id), proposal, box)
-        db.update(doc_id, status="filed")
+    if not db.claim(doc_id, "awaiting_approval", "filing"):
+        raise ValueError("this document is already being reviewed")
+    review_rec = {"action": action, "edits": (edits or {}) if action == "approve" else {}, "note": note,
+                  "by": reviewer}
+    db.update(doc_id, proposal=proposal, review=review_rec)
+    db.event(doc_id, "review", **review_rec)
+
+    def finish():
+        mem, bx = memory or Memory(), box or Box()
+        try:
+            if action == "approve":
+                file_out(db.get(doc_id), proposal, bx)
+            _remember(doc, doc_id, action, proposal, edits, note, mem)
+            db.update(doc_id, status="filed" if action == "approve" else "rejected")
+        except Exception as e:  # noqa: BLE001 — leave it reviewable again, with the error visible
+            db.event(doc_id, "error", error=f"review failed: {type(e).__name__}: {e}"[:400])
+            db.update(doc_id, status="awaiting_approval")
+
+    if background:
+        threading.Thread(target=finish, daemon=True).start()
+    else:
+        finish()
+    return db.get(doc_id)
+
+
+def _remember(doc, doc_id, action, proposal, edits, note, memory):
     # Memory gets the person's own words plus short, flattened field values — never document-controlled
     # free text such as the file name or the model's reason, so an approved document cannot poison memory.
     def flat(v, n=80):
         return " ".join(str(v).split())[:n]
-    changed = ", ".join(f"{k}: {flat(doc['proposal'].get(k), 60)!r} -> {flat(v, 60)!r}" for k, v in (edits or {}).items())
+    changed = ", ".join(f"{k}: {flat(doc['proposal'].get(k), 60)!r} -> {flat(v, 60)!r}"
+                        for k, v in (edits or {}).items()) if action == "approve" else ""
     text = (f"{proposal.get('doc_type')} from {flat(proposal.get('issuer'))}. "
             f"The person {'rejected it' if action == 'reject' else 'approved it'}"
             f"{' with changes: ' + changed if changed else ''}. The person's note: {flat(note, 400) or '-'}")
     memory.remember(f"doc-{doc_id}", text, action=action, doc_type=proposal.get("doc_type", ""),
                     when=time.strftime("%Y-%m-%d"))
     db.event(doc_id, "remembered", text=text)
-    return db.get(doc_id)

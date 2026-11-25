@@ -229,3 +229,20 @@ deep link `#doc=N`, US time format, light theme optimised for video (dark checke
 reviewed, `node --check` passes, every document-derived value goes through `esc()`.
 Lesson: the earlier blank page came from a literal newline inside a JS string; curl-only testing missed it.
 Always `node --check` the page script before deploying.
+
+### Bug: review ran several times on repeated clicks — Nov 25, late night
+User clicked Approve 3× then Reject on #3 because nothing seemed to happen. Events showed 3 approvals + 1 reject,
+3 Box uploads, 4 memory writes. Causes: (1) a review took 8–10 s (two Box uploads + Pinecone) inside the
+request; (2) the 1.5 s poll re-rendered the detail when the review event appeared, re-enabling the buttons
+while the status was still awaiting_approval; (3) the server did not claim the document.
+Fix: `pipeline.review` validates first, then `db.claim(id, awaiting_approval → filing)` atomically; a second
+click gets "already being reviewed"; the web call returns at once (`background=True`) and Box + memory run in a
+thread, ending in filed/rejected (on failure: back to awaiting_approval with an error event). Startup turns a
+stuck `filing` back into awaiting_approval. UI shows "Approved — filing on Box…" instead of the form.
+`tests/test_review.py`: 4 parallel clicks → exactly one review, ≤ 2 uploads, 1 memory write; background answers
+in < 0.15 s; an invalid review does not claim. 34 tests.
+Slowness: the server answers in ~2 ms; each request costs ~0.3 s of network (Italy → Fly proxy → Sprite), and a
+click waited for the in-flight poll. Now a click highlights the row and paints the detail at once from a
+browser cache (prefetched for changed docs on each poll), then refreshes. Verified by rendering the page in
+headless Chrome against the mock (content present), plus `node --check`.
+Data left by the bug: #3 filed 3× on Box (Paystubs) — clean with reset-demo + manual Box cleanup before recording.

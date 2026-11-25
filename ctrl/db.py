@@ -70,6 +70,14 @@ def update(doc_id, **fields):
         db().execute(f"UPDATE documents SET {cols} WHERE id=?", (*fields.values(), doc_id))
 
 
+def claim(doc_id, from_status, to_status):
+    """Atomically move a document from one status to another. False if someone else got there first."""
+    with _lock, db():
+        cur = db().execute("UPDATE documents SET status=?, updated=? WHERE id=? AND status=?",
+                           (to_status, time.time(), doc_id, from_status))
+        return cur.rowcount == 1
+
+
 def get(doc_id):
     return _row(db().execute("SELECT * FROM documents WHERE id=?", (doc_id,)).fetchone())
 

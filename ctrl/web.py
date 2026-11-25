@@ -156,7 +156,7 @@ class Handler(BaseHTTPRequestHandler):
                 edits = {k: v for k, v in (req.get("edits") or {}).items() if v not in (None, "")}
                 if "total" in edits:
                     edits["total"] = float(str(edits["total"]).replace(",", "").replace("$", ""))
-                d = pipeline.review(doc_id, action, edits, str(req.get("note", ""))[:1000])
+                d = pipeline.review(doc_id, action, edits, str(req.get("note", ""))[:1000], background=True)
                 return self._send(200, {"status": d["status"]})
         except ValueError as e:
             return self._send(400, {"error": str(e)})
@@ -175,6 +175,9 @@ def main():
     for d in db.documents(500):  # documents interrupted by a restart go back to the queue
         if d["status"] == "processing":
             db.update(d["id"], status="queued")
+        elif d["status"] == "filing":  # a review interrupted mid-upload: let the person review it again
+            db.event(d["id"], "error", error="filing was interrupted by a restart; please review again")
+            db.update(d["id"], status="awaiting_approval")
     threading.Thread(target=worker_loop, daemon=True).start()
     ThreadingHTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
 

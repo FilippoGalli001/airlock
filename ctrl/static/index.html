@@ -315,6 +315,7 @@ function statusOf(d) {
     case "processing": return ["In the chamber", "blue pulse"];
     case "filed": return [d.action === "APPROVAL" ? "Approved · filed" : "Auto-filed", "green"];
     case "awaiting_approval": return ["Needs you", "amber"];
+    case "filing": return ["Filing…", "blue pulse"];
     case "quarantined": return d.red ? ["Red alarm", "solidred"] : ["Quarantined", "red"];
     case "rejected": return ["Rejected", ""];
     default: return [d.status, ""];
@@ -352,11 +353,26 @@ function renderState(s) {
   if (focusId) { const b = ul.querySelector(`.doc[data-id="${CSS.escape(focusId)}"]`); if (b) b.focus(); }
 }
 
+// Documents already seen are painted instantly from this cache, then refreshed from the server.
+const CACHE = new Map();
+
 function select(id, scroll) {
   if (id === selected) { if (scroll) toDetail(); return; }
   selected = id; lastDetail = ""; lastQueue = "";
   try { history.replaceState(null, "", "#doc=" + id); } catch {}
-  tick().then(() => { if (scroll) toDetail(); });
+  document.querySelectorAll("#docs .doc").forEach(b => {      // highlight now, don't wait for the poll
+    const on = +b.dataset.id === id; b.classList.toggle("sel", on); on ? b.setAttribute("aria-current", "true") : b.removeAttribute("aria-current"); });
+  if (CACHE.has(id)) paint(CACHE.get(id));
+  if (scroll) toDetail();
+  renderDetail().catch(() => {});                              // fresh copy, without waiting for the next poll
+}
+
+function prefetch(docs) {
+  for (const d of docs) {
+    const c = CACHE.get(d.id);
+    if (!c || c.status !== d.status || c.updated !== d.updated)
+      api(`/api/doc/${d.id}`).then(x => CACHE.set(x.id, x)).catch(() => {});
+  }
 }
 function toDetail() { if (matchMedia("(max-width: 900px)").matches) $("#detail").scrollIntoView({ behavior: "smooth", block: "start" }); }
 
@@ -401,6 +417,7 @@ function stages(d, f) {
     : S("Policy", "waiting", "idle"));
   out.push(d.status === "filed" ? S("Result", "filed on Box", "ok")
     : d.status === "awaiting_approval" ? S("Result", "waiting for you", "warn")
+    : d.status === "filing" ? S("Result", "saving your review…", "cur")
     : d.status === "quarantined" ? S("Result", "nothing left", "bad")
     : d.status === "rejected" ? S("Result", "rejected", "") : S("Result", "waiting", "idle"));
   out.push(f.rf ? S("Reset", "failed", "bad") : f.rs ? S("Reset", `${esc(f.rs.checkpoint)} · ${esc(f.rs.seconds)} s`, "ok")
@@ -419,6 +436,9 @@ function verdictCard(d, f) {
     sub = "Live. This page updates by itself."; }
   else if (d.status === "awaiting_approval") { cls = "amber"; icon = ICON.hand; title = "Needs your review";
     sub = "Policy chose APPROVAL. Nothing goes to Box until you approve below."; }
+  else if (d.status === "filing") { cls = "blue"; icon = ICON.dots;
+    title = rv && rv.action === "reject" ? "Saving your rejection…" : "Approved — filing on Box…";
+    sub = "Uploading to Box and saving your note to memory. This page updates by itself."; }
   else if (d.status === "filed") { cls = "green"; icon = ICON.check;
     title = rv && rv.action === "approve" ? "Approved by you, filed on Box" : "Filed on Box automatically";
     sub = filed ? `Saved to <b>Airlock/Trusted/${esc(filed.folder)}</b> with an .airlock.json record.` : "";
@@ -604,7 +624,12 @@ function wireReview(id) {
 async function renderDetail() {
   if (selected == null) return;
   const d = await api(`/api/doc/${selected}`);
+  CACHE.set(d.id, d);
   if (d.id !== selected) return;            // user clicked another document while this one was loading
+  paint(d);
+}
+
+function paint(d) {
   const liveKey = d.status === "processing" || d.status === "queued" ? [phase.step, phase.doc] : null;
   const key = JSON.stringify([d.id, d.status, d.events.length, d.proposal, liveKey]);
   if (key === lastDetail) return;           // don't wipe a half-filled review form
@@ -637,7 +662,8 @@ function tick() {
   ticking = (async () => {
     try { const s = await api("/api/state"); $("#net").hidden = true; renderState(s);
           if (selected == null && s.docs.length) { selected = s.docs[0].id; lastQueue = ""; renderState(s); }
-          await renderDetail(); }
+          await renderDetail();
+          prefetch(s.docs.slice(0, 20)); }
     catch (e) { if (e.message !== "login") { $("#net").hidden = false; console.warn(e); } }
     finally { ticking = null; }
   })();
