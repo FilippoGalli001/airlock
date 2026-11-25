@@ -36,5 +36,11 @@ The AI proposes, the code decides, people approve what is risky.
 - Windows 11, Git Bash + PowerShell. Sprite CLI: `%LOCALAPPDATA%\Programs\Sprite\sprite.exe` (on user PATH).
 - WSL2 Ubuntu available as a fallback.
 
+## How to run
+- Tests: `python -m unittest discover -s tests -t .`
+- Rebuild chamber: `bash scripts/build-chamber-baseline.sh` (→ `.env.chamber`), smoke: `python -u scripts/chamber_smoke.py`
+- Deploy ctrl: `bash scripts/deploy-ctrl.sh`, then on ctrl `cd ~/airlock && python3 -m ctrl.cli ...`
+  (`setup | add FILE | sync | process ID [--redteam] | list | show ID | approve ID --set k=v --note .. | reject ID --note ..`)
+
 ## Status
 See the top of `DEVLOG.md`.

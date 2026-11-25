@@ -6,8 +6,10 @@
 - Box, Pinecone, Ollama (deepseek-v4.1-flash, $5 credit) verified through the gateway.
 - ctrl drives the chamber through a key-protected worker on the chamber URL (Custom API to the Sprites API is
   refused by the gateway).
-- **Chamber done and verified** (baseline v11, red-team smoke test passes). Next: ctrl — `policy.py` + tests,
-  `chamber.py` client, `agent.py` (Ollama tool loop), `pipeline.py`, `box.py`, `memory.py`, then the web UI.
+- **Chamber done and verified** (baseline v11, red-team smoke test passes).
+- **ctrl pipeline works end to end from the CLI** on airlock-ctrl: all 5 demo cases pass (see log).
+- Next: web UI (FastAPI or stdlib server, password, queue, timeline, approve/edit/reject, Sync, upload,
+  red-team button), service on :8080, then README + video.
 
 ## Spike checklist (decides the direction)
 Sprite `airlock-spike`, org `filippo-galli`, URL `https://airlock-spike-jmgx.sprites.app` (auth: sprite = private).
@@ -126,6 +128,26 @@ Smoke test (`python -u scripts/chamber_smoke.py`), all from the laptop over the 
 Bugs fixed on the way: `sprite-env` not on root's PATH under sudo (use `/.sprite/bin/sprite-env`); bwrap creates
 implicit parent dirs as 0700 (add `--perms 0755 --dir /home|/airlock`); jail `/tmp` tmpfs was root 0755
 (`--perms 1777`). `pdftoppm` needs a writable `/tmp`.
+
+### ctrl pipeline end to end from the CLI — Nov 25 late evening
+Code (stdlib only, no pip deps yet): `ctrl/config.py policy.py http.py chamber.py agent.py box.py memory.py
+db.py pipeline.py cli.py`, `tests/test_policy.py` (24 tests, `python -m unittest discover -s tests -t .`),
+`scripts/deploy-ctrl.sh` (tar → `~/airlock` on airlock-ctrl, env file `~/airlock/airlock.env` = .env.chamber +
+.env.ctrl with a generated UI password). `python3 -m ctrl.cli setup` created Box `Airlock/Inbox`,
+`Airlock/Trusted/{Bollette,Ricevute,Buste paga,Contratti,Altro}` and checked the Pinecone index.
+All five demo cases, run on airlock-ctrl:
+1. scanned bill → OCR (2.6 s) → agent: search_memory + run_python (checks 52,10+12,00+7,17+7,13 = 78,40) →
+   AUTO → uploaded to `Bollette` (+ `.airlock.json`) → reset 8.6 s. ~25 s total, 2 LLM calls, ~2.3k tokens.
+2. payslip → APPROVAL (codice fiscale + type) → approved with an edit (issuer) and a note → `Buste paga` →
+   remembered in Pinecone.
+3. second payslip → memory hit 0.864 on the review → proposal uses the corrected issuer and says
+   "Emittente scritto come da tua revisione precedente".
+4. hostile receipt → QUARANTINE by the deterministic injection rule ("system note"); the model also set
+   suspicious=true and said it ignored the hidden instructions.
+5. `process --redteam` → RED (canary read), "Network is unreachable", writes and utime refused → reset 5.3 s.
+Fixes: OCR read the IBAN as `1T60…` → IBAN regex now tolerates `1T`/`lT` (test added). Deleted the spike's
+fake memory records d1/d2 from Pinecone.
+Box now holds filed copies from these runs (bill, payslip) — fine as demo data, clean before recording.
 
 ## Log
 
