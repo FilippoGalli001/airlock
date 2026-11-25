@@ -18,6 +18,12 @@ from .memory import Memory
 from .policy import Alarms
 
 CHAMBER_LOCK = threading.Lock()
+# what the chamber is doing right now, for the UI: idle | extract | agent | reset
+PHASE = {"step": "idle", "doc": None, "since": time.time()}
+
+
+def phase(step, doc=None):
+    PHASE.update(step=step, doc=doc, since=time.time())
 EXT_OK = {"pdf", "png", "jpg", "jpeg", "tif", "tiff", "webp", "txt", "csv"}
 FILES = os.path.join(config.DATA_DIR, "files")
 
@@ -91,9 +97,11 @@ def sync_box(box=None):
     return new
 
 
-def process(doc_id, redteam=False, chamber=None, memory=None, box=None):
+def process(doc_id, redteam=None, chamber=None, memory=None, box=None):
     chamber, memory, box = chamber or Chamber(), memory or Memory(), box or Box()
     doc = db.get(doc_id)
+    if redteam is None:
+        redteam = doc["source"] == "redteam"
     alarms = Alarms()
     events = []
 
@@ -105,6 +113,7 @@ def process(doc_id, redteam=False, chamber=None, memory=None, box=None):
         try:
             with open(file_path(doc), "rb") as f:
                 data = f.read()
+            phase("extract", doc_id)
             ex = chamber.extract(data, doc["ext"])
             merge_alarms(alarms, job=ex)
             extract = ex.get("extract") or {}
@@ -120,6 +129,7 @@ def process(doc_id, redteam=False, chamber=None, memory=None, box=None):
             merge_alarms(alarms, check=chamber.check())
             proposal = None
             if not (alarms.canary_read or alarms.canary_in_output) and text.strip():
+                phase("agent", doc_id)
                 try:
                     proposal = agent.run(text, chamber, memory, alarms, events, budget_ok=db.spend_llm_call)
                 finally:
@@ -152,11 +162,13 @@ def process(doc_id, redteam=False, chamber=None, memory=None, box=None):
             db.update(doc_id, status="quarantined",
                       decision={"action": policy.QUARANTINE, "reasons": [f"pipeline error: {type(e).__name__}"]})
         finally:
+            phase("reset", doc_id)
             try:
                 secs = chamber.reset()
                 log("reset", seconds=secs, checkpoint=chamber.baseline)
             except Exception as e:  # noqa: BLE001
                 log("reset_failed", error=str(e)[:300])
+            phase("idle")
     return db.get(doc_id)
 
 
@@ -170,7 +182,8 @@ def file_out(doc, proposal, box):
     meta = {"airlock": {"document": doc["id"], "sha256": doc["sha256"], "filed": time.strftime("%Y-%m-%d %H:%M"),
                         "decision": (db.get(doc["id"]) or {}).get("decision")}, **proposal}
     box.upload(folder, f"{stem}.airlock.json", json.dumps(meta, ensure_ascii=False, indent=2).encode())
-    db.event(doc["id"], "filed", folder=config.FOLDERS.get(proposal["doc_type"], "Altro"), box_file_id=fid)
+    db.event(doc["id"], "filed", folder=config.FOLDERS.get(proposal["doc_type"], "Altro"), box_file_id=fid,
+             box_folder_id=folder)
 
 
 def review(doc_id, action, edits=None, note="", reviewer="you", memory=None, box=None):

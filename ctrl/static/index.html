@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Airlock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#f5f4ef; --panel:#ffffff; --panel2:#faf9f5; --ink:#1c1b19; --muted:#6d6a63; --faint:#9c998f;
+    --line:#e5e2d9; --green:#2f7a53; --green-bg:#e7f3ec; --amber:#a86a0b; --amber-bg:#fbf0dc;
+    --red:#b3261e; --red-bg:#fbe7e5; --blue:#2c5fa8; --blue-bg:#e6eef9; --chip:#efede6;
+    --mono:"JetBrains Mono", ui-monospace, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#111210; --panel:#191a18; --panel2:#1e1f1c; --ink:#ebeae4; --muted:#a19e95; --faint:#76736b;
+      --line:#2b2c29; --green:#6cc394; --green-bg:#16271d; --amber:#e2a54a; --amber-bg:#2b2213;
+      --red:#ef7b72; --red-bg:#2e1715; --blue:#7fa9e6; --blue-bg:#16213a; --chip:#252623;
+    }
+  }
+  * { box-sizing:border-box; }
+  html, body { margin:0; background:var(--bg); color:var(--ink); }
+  body { font:14px/1.5 Inter, system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing:antialiased; }
+  button, input, select, textarea { font:inherit; color:inherit; }
+  code, pre, .mono { font-family:var(--mono); font-size:12.5px; }
+
+  /* top bar: the two Sprites */
+  .bar { display:grid; grid-template-columns:auto 1fr auto 1fr; gap:14px; align-items:center;
+         padding:12px 20px; border-bottom:1px solid var(--line); background:var(--panel); position:sticky; top:0; z-index:5; }
+  .brand { font-weight:700; font-size:16px; letter-spacing:-.01em; display:flex; align-items:center; gap:8px; }
+  .brand svg { width:20px; height:20px; }
+  .sprite { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:8px 12px; border:1px solid var(--line);
+            border-radius:10px; background:var(--panel2); min-width:0; }
+  .sprite .name { font-family:var(--mono); font-weight:500; font-size:13px; }
+  .sprite .role { color:var(--muted); font-size:12px; margin-right:auto; }
+  .arrow { color:var(--faint); font-size:12px; text-align:center; white-space:nowrap; }
+  .chip { display:inline-flex; align-items:center; gap:5px; padding:2px 8px; border-radius:999px; font-size:12px;
+          background:var(--chip); color:var(--muted); white-space:nowrap; }
+  .chip.green { background:var(--green-bg); color:var(--green); }
+  .chip.amber { background:var(--amber-bg); color:var(--amber); }
+  .chip.red { background:var(--red-bg); color:var(--red); }
+  .chip.blue { background:var(--blue-bg); color:var(--blue); }
+  .dot { width:7px; height:7px; border-radius:50%; background:currentColor; }
+  .pulse .dot { animation:pulse 1s infinite ease-in-out; }
+  @keyframes pulse { 50% { opacity:.25; } }
+
+  /* layout */
+  main { display:grid; grid-template-columns:minmax(280px, 360px) 1fr; gap:20px; padding:20px; max-width:1400px; margin:0 auto; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:12px; }
+  .queue-head { padding:14px; border-bottom:1px solid var(--line); display:flex; gap:8px; flex-wrap:wrap; }
+  .btn { padding:7px 12px; border-radius:8px; border:1px solid var(--line); background:var(--panel); cursor:pointer;
+         font-weight:500; font-size:13px; }
+  .btn:hover { border-color:var(--faint); }
+  .btn.primary { background:var(--ink); color:var(--bg); border-color:var(--ink); }
+  .btn.danger { color:var(--red); border-color:color-mix(in srgb, var(--red) 40%, var(--line)); }
+  .btn:disabled { opacity:.5; cursor:default; }
+  .docs { list-style:none; margin:0; padding:6px; max-height:calc(100vh - 210px); overflow:auto; }
+  .doc { padding:10px 10px; border-radius:8px; cursor:pointer; display:grid; grid-template-columns:1fr auto; gap:2px 10px; }
+  .doc:hover { background:var(--panel2); }
+  .doc.sel { background:var(--chip); }
+  .doc .n { font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .doc .m { color:var(--faint); font-size:12px; grid-column:1; }
+  .doc .chip { grid-row:1 / span 2; grid-column:2; align-self:center; }
+  .empty { color:var(--muted); padding:28px; text-align:center; }
+  .budget { padding:10px 14px; border-top:1px solid var(--line); color:var(--faint); font-size:12px; }
+
+  /* detail */
+  .detail { padding:22px 24px; min-width:0; }
+  .dh { display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap; margin-bottom:18px; }
+  .dh h2 { margin:0; font-size:20px; letter-spacing:-.01em; word-break:break-all; }
+  .dh .sub { color:var(--muted); font-size:13px; width:100%; }
+  .steps { list-style:none; margin:0; padding:0; position:relative; }
+  .steps::before { content:""; position:absolute; left:13px; top:6px; bottom:6px; width:2px; background:var(--line); }
+  .step { position:relative; padding:0 0 18px 40px; }
+  .step .ic { position:absolute; left:4px; top:1px; width:20px; height:20px; border-radius:50%; display:grid;
+              place-items:center; font-size:11px; font-weight:700; background:var(--panel); border:2px solid var(--line); color:var(--muted); }
+  .step.ok .ic { border-color:var(--green); color:var(--green); }
+  .step.warn .ic { border-color:var(--amber); color:var(--amber); }
+  .step.bad .ic { border-color:var(--red); color:var(--red); background:var(--red-bg); }
+  .step.info .ic { border-color:var(--blue); color:var(--blue); }
+  .step .t { font-weight:600; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .step .meta { color:var(--muted); font-size:12.5px; font-family:var(--mono); }
+  .step .body { margin-top:6px; color:var(--ink); }
+  .reasons { margin:6px 0 0; padding-left:18px; }
+  .reasons li { margin:2px 0; }
+  .box { border:1px solid var(--line); border-radius:8px; background:var(--panel2); padding:10px 12px; margin-top:8px; }
+  .box.red { border-color:color-mix(in srgb, var(--red) 45%, var(--line)); background:var(--red-bg); }
+  .box.amber { border-color:color-mix(in srgb, var(--amber) 45%, var(--line)); background:var(--amber-bg); }
+  .box.green { border-color:color-mix(in srgb, var(--green) 40%, var(--line)); background:var(--green-bg); }
+  pre { margin:6px 0 0; white-space:pre-wrap; word-break:break-word; max-height:260px; overflow:auto;
+        background:var(--panel2); border:1px solid var(--line); border-radius:6px; padding:8px 10px; }
+  details summary { cursor:pointer; color:var(--muted); font-size:12.5px; margin-top:6px; }
+  .tool { border-left:2px solid var(--line); padding:2px 0 8px 12px; margin:8px 0 0; }
+  .tool .k { font-family:var(--mono); font-size:12.5px; font-weight:500; }
+  .kv { display:grid; grid-template-columns:max-content 1fr; gap:4px 14px; margin-top:8px; font-size:13px; }
+  .kv dt { color:var(--muted); }
+  .kv dd { margin:0; word-break:break-word; }
+  form.review { display:grid; gap:10px; margin-top:10px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  label { display:grid; gap:4px; font-size:12px; color:var(--muted); }
+  input, select, textarea { padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:var(--panel); }
+  textarea { min-height:60px; resize:vertical; }
+  .changed { border-color:var(--amber); background:var(--amber-bg); }
+  .err { color:var(--red); font-size:13px; }
+  .hint { color:var(--faint); font-size:12px; }
+  a { color:var(--blue); }
+
+  @media (max-width: 900px) {
+    .bar { grid-template-columns:1fr; padding:12px 16px; }
+    .arrow { display:none; }
+    main { grid-template-columns:1fr; padding:16px; }
+    .docs { max-height:none; }
+    .detail { padding:18px 16px; }
+    .grid2 { grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+<header class="bar">
+  <div class="brand">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M9 3v18M15 3v18"/></svg>
+    Airlock
+  </div>
+  <div class="sprite">
+    <span class="name">airlock-ctrl</span><span class="role">connectors · never runs untrusted code</span>
+    <span class="chip green">Ollama</span><span class="chip green">Box</span><span class="chip green">Pinecone</span>
+  </div>
+  <div class="arrow">key-authed HTTPS →</div>
+  <div class="sprite">
+    <span class="name">chamber-1</span><span class="role">untrusted work, jailed</span>
+    <span class="chip">0 connectors</span><span class="chip red">egress: deny all</span>
+    <span class="chip" id="baseline">baseline —</span>
+    <span class="chip green" id="chamber"><span class="dot"></span><span>CLEAN</span></span>
+  </div>
+</header>
+
+<main>
+  <section class="panel">
+    <div class="queue-head">
+      <button class="btn primary" id="upload">Upload</button>
+      <button class="btn" id="sync">Sync from Box</button>
+      <button class="btn danger" id="redteam" title="Assume the LLM was fooled: run hostile code in the chamber">Red-team drill</button>
+      <input type="file" id="file" hidden accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.webp,.txt,.csv" multiple>
+    </div>
+    <ul class="docs" id="docs"></ul>
+    <div class="budget" id="budget"></div>
+  </section>
+  <section class="panel detail" id="detail"><div class="empty">Upload a document, or pick one from the queue.</div></section>
+</main>
+
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const secs = ms => (ms == null ? "" : (ms / 1000).toFixed(1) + " s");
+let selected = null, lastDetail = "";
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, { ...opts, headers: { "X-Airlock": "1", ...(opts.headers || {}) } });
+  if (r.status === 401) { location.href = "/login"; throw new Error("login"); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+
+const STATUS = {
+  queued: ["queued", ""], processing: ["in the airlock", "blue pulse"],
+  filed: ["filed · auto", "green"], awaiting_approval: ["needs approval", "amber"],
+  quarantined: ["quarantined", "red"], rejected: ["rejected", ""],
+};
+function statusChip(d) {
+  let [label, cls] = STATUS[d.status] || [d.status, ""];
+  if (d.status === "filed" && d.action === "APPROVAL") label = "filed · approved";
+  if (d.status === "quarantined" && d.red) label = "quarantined · red";
+  return `<span class="chip ${cls}"><span class="dot"></span>${esc(label)}</span>`;
+}
+
+function renderState(s) {
+  $("#baseline").textContent = "baseline " + (s.chamber.baseline || "—");
+  const ph = s.phase || {}, ch = $("#chamber");
+  const map = { idle: ["CLEAN", "green"], extract: [`DIRTY · reading #${ph.doc}`, "amber pulse"],
+                agent: [`DIRTY · agent on #${ph.doc}`, "amber pulse"], reset: ["RESTORING…", "blue pulse"] };
+  const [label, cls] = map[ph.step] || map.idle;
+  ch.className = "chip " + cls; ch.innerHTML = `<span class="dot"></span><span>${esc(label)}</span>`;
+  $("#budget").textContent = `LLM calls today ${s.budget.llm_calls} / ${s.budget.cap} · ${s.ctrl.model}`;
+  const ul = $("#docs");
+  if (!s.docs.length) { ul.innerHTML = `<li class="empty">No documents yet.</li>`; return; }
+  ul.innerHTML = s.docs.map(d => `
+    <li class="doc ${d.id === selected ? "sel" : ""}" data-id="${d.id}">
+      <span class="n">${esc(d.name)}</span>${statusChip(d)}
+      <span class="m">#${d.id} · ${esc(d.source)} · ${new Date(d.created * 1000).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})}</span>
+    </li>`).join("");
+  ul.querySelectorAll(".doc").forEach(li => li.onclick = () => { selected = +li.dataset.id; lastDetail = ""; tick(); });
+}
+
+function step(cls, icon, title, meta, body = "") {
+  return `<li class="step ${cls}"><span class="ic">${icon}</span>
+    <div class="t">${title}${meta ? `<span class="meta">${meta}</span>` : ""}</div>${body ? `<div class="body">${body}</div>` : ""}</li>`;
+}
+
+function timeline(d) {
+  const ev = d.events, out = [];
+  const find = k => ev.filter(e => e.kind === k);
+  const ex = find("extract")[0];
+  if (ex) out.push(step(ex.chars ? "ok" : "warn", "1", "Chamber · read the document",
+    `${esc(ex.method)} · ${ex.chars} chars · ${secs(ex.ms)}`,
+    `<span class="hint">Parsed and OCR'd inside the jail on chamber-1 — never on ctrl.</span>
+     <details><summary>extracted text (untrusted)</summary><pre>${esc(ex.text)}</pre></details>`));
+
+  for (const r of find("redteam")) out.push(step("bad", "!", "Red-team drill · assume the LLM was fooled",
+    secs(r.ms), `This hostile script ran in the chamber: read a credential, phone home, write outside /work, hide the read.
+     <details open><summary>script</summary><pre>${esc(r.code)}</pre></details>
+     <details open><summary>what the jail answered</summary><pre>${esc(r.stdout)}</pre></details>`));
+
+  const llm = find("llm");
+  if (llm.length) {
+    const tok = llm.reduce((a, e) => a + (e.prompt_tokens || 0) + (e.completion_tokens || 0), 0);
+    const ms = llm.reduce((a, e) => a + (e.ms || 0), 0);
+    const tools = ev.filter(e => ["memory", "run_python", "abort"].includes(e.kind)).map(e => {
+      if (e.kind === "memory") return `<div class="tool"><span class="k">search_memory</span> <span class="meta">“${esc(e.query)}”</span>
+        ${(e.hits || []).length ? e.hits.map(h => `<div class="box"><span class="chip blue">Pinecone ${h.score}</span> ${esc(h.text)}</div>`).join("")
+          : `<div class="hint">no past reviews</div>`}</div>`;
+      if (e.kind === "run_python") return `<div class="tool"><span class="k">run_python</span>
+        <span class="meta">in the chamber · exit ${e.returncode} · ${secs(e.ms)}</span>
+        <details><summary>code written by the model</summary><pre>${esc(e.code)}</pre></details>
+        <pre>${esc(e.stdout || e.stderr || "(no output)")}</pre></div>`;
+      return `<div class="box red">${esc(e.why)}</div>`;
+    }).join("");
+    out.push(step("info", "2", "Agent · Ollama", `${esc(llm[0].model)} · ${llm.length} calls · ${(tok / 1000).toFixed(1)}k tok · ${secs(ms)}`,
+      tools || `<span class="hint">no tool calls</span>`));
+  }
+
+  const al = find("alarms")[0];
+  if (al) {
+    const red = [], yel = [];
+    if (al.canary_read) red.push("A canary credential was read inside the chamber (atime moved)");
+    if (al.canary_in_output) red.push("The canary string reached an output or a tool call");
+    if (al.timed_out) yel.push("A chamber job hit its time limit");
+    if (al.truncated) yel.push("Chamber output was truncated");
+    (al.blocked || []).forEach(b => yel.push("Blocked by the jail: " + b));
+    out.push(red.length ? step("bad", "3", "Chamber alarms · RED", "", `<div class="box red"><ul class="reasons">${red.concat(yel).map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>`)
+      : yel.length ? step("warn", "3", "Chamber alarms · YELLOW", "", `<div class="box amber"><ul class="reasons">${yel.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>`)
+      : step("ok", "3", "Chamber alarms · clean", "canaries untouched · nothing blocked"));
+  }
+
+  const pol = find("policy")[0];
+  if (pol) {
+    const cls = { AUTO: "ok", APPROVAL: "warn", QUARANTINE: "bad" }[pol.action];
+    const chip = { AUTO: "green", APPROVAL: "amber", QUARANTINE: "red" }[pol.action];
+    out.push(step(cls, "4", `Policy · <span class="chip ${chip}">${esc(pol.action)}</span>`, "policy.py · deterministic",
+      `<ul class="reasons">${(pol.reasons || []).map(r => `<li>${esc(r)}</li>`).join("")}</ul>`));
+  }
+
+  const p = d.proposal && typeof d.proposal === "object" ? d.proposal : null;
+  if (p && !p.invalid) out.push(step("", "·", "The model's proposal", `confidence ${p.confidence}`,
+    `<dl class="kv"><dt>type</dt><dd>${esc(p.doc_type)}</dd><dt>issuer</dt><dd>${esc(p.issuer)}</dd>
+     <dt>date</dt><dd>${esc(p.date || "—")}</dd><dt>total</dt><dd>${p.total_eur == null ? "—" : esc(p.total_eur) + " €"}</dd>
+     <dt>reason</dt><dd>${esc(p.reason)}</dd></dl>
+     ${p.fields ? `<details><summary>other fields</summary><pre>${esc(JSON.stringify(p.fields, null, 1))}</pre></details>` : ""}`));
+
+  if (d.status === "awaiting_approval") out.push(step("warn", "5", "Your review", "", reviewForm(p)));
+  for (const r of find("review")) out.push(step(r.action === "approve" ? "ok" : "bad", "5",
+    r.action === "approve" ? (Object.keys(r.edits || {}).length ? "Approved with your changes" : "Approved") : "Rejected", esc(r.by),
+    `${Object.keys(r.edits || {}).length ? `<pre>${esc(JSON.stringify(r.edits))}</pre>` : ""}${r.note ? `<div class="box">“${esc(r.note)}”</div>` : ""}`));
+  for (const m of find("remembered")) out.push(step("info", "·", "Remembered in Pinecone", "only reviewed decisions are stored", `<div class="hint">${esc(m.text)}</div>`));
+  for (const f of find("filed")) out.push(step("ok", "→", `Filed on Box · ${esc(f.folder)}`, "Airlock/Trusted",
+    `<a href="https://app.box.com/folder/${esc(f.box_folder_id || "")}" target="_blank" rel="noopener">open the folder</a> · original + .airlock.json`));
+  if (d.status === "quarantined") out.push(step("bad", "■", "Nothing left the airlock", "", `<span class="hint">No upload to Box, no memory.</span>`));
+  for (const e of find("error")) out.push(step("bad", "!", "Error", "", `<pre>${esc(e.error)}</pre>`));
+
+  const rs = find("reset")[0], rf = find("reset_failed")[0];
+  if (rs) out.push(step("ok", "6", `Chamber restored to ${esc(rs.checkpoint)}`, `${rs.seconds} s · CLEAN`,
+    `<span class="hint">Every file the document or the code touched is gone. Next document starts from the baseline.</span>`));
+  if (rf) out.push(step("bad", "6", "Chamber reset failed", "", `<pre>${esc(rf.error)}</pre>`));
+  if (d.status === "processing" || d.status === "queued")
+    out.push(step("info", "…", d.status === "queued" ? "Waiting for the chamber" : "Working…", ""));
+  return `<ul class="steps">${out.join("")}</ul>`;
+}
+
+function reviewForm(p) {
+  p = p || {};
+  const types = ["utility_bill", "receipt", "payslip", "contract", "other"];
+  return `<form class="review" id="review">
+    <div class="grid2">
+      <label>type<select name="doc_type" data-orig="${esc(p.doc_type)}">${types.map(t => `<option ${t === p.doc_type ? "selected" : ""}>${t}</option>`).join("")}</select></label>
+      <label>issuer<input name="issuer" value="${esc(p.issuer)}" data-orig="${esc(p.issuer)}"></label>
+      <label>date<input name="date" value="${esc(p.date)}" data-orig="${esc(p.date)}" placeholder="YYYY-MM-DD"></label>
+      <label>total €<input name="total_eur" value="${esc(p.total_eur ?? "")}" data-orig="${esc(p.total_eur ?? "")}"></label>
+    </div>
+    <label>note (required if you change something or reject)<textarea name="note" placeholder="Why — the agent will remember this next time"></textarea></label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" name="approve" type="submit">Approve</button>
+      <button class="btn danger" name="reject" type="button">Reject</button></div>
+    <div class="err" id="rerr"></div></form>`;
+}
+
+function wireReview(id) {
+  const f = $("#review"); if (!f) return;
+  const fields = [...f.querySelectorAll("[data-orig]")];
+  const edits = () => Object.fromEntries(fields.filter(el => el.value !== el.dataset.orig).map(el => [el.name, el.value]));
+  const refresh = () => { fields.forEach(el => el.classList.toggle("changed", el.value !== el.dataset.orig));
+    f.approve.textContent = Object.keys(edits()).length ? "Approve with my changes" : "Approve"; };
+  fields.forEach(el => el.addEventListener("input", refresh));
+  const send = async action => {
+    $("#rerr").textContent = "";
+    try { await api(`/api/doc/${id}/${action}`, { method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ edits: action === "approve" ? edits() : {}, note: f.note.value }) });
+          lastDetail = ""; tick(); }
+    catch (e) { $("#rerr").textContent = e.message; }
+  };
+  f.onsubmit = e => { e.preventDefault(); send("approve"); };
+  f.reject.onclick = () => send("reject");
+}
+
+async function renderDetail() {
+  if (selected == null) return;
+  const d = await api(`/api/doc/${selected}`);
+  const key = JSON.stringify([d.status, d.events.length, d.proposal]);
+  if (key === lastDetail) return;           // don't wipe a half-filled review form
+  lastDetail = key;
+  $("#detail").innerHTML = `<div class="dh"><h2>${esc(d.name)}</h2>${statusChip({ ...d, action: d.decision?.action,
+      red: (d.decision?.reasons || []).some(r => r.startsWith("RED")) })}
+    <div class="sub">#${d.id} · ${esc(d.source)} · ${(d.size / 1024).toFixed(0)} KB · sha256 ${esc(d.sha256.slice(0, 12))}…</div></div>${timeline(d)}`;
+  wireReview(d.id);
+}
+
+async function tick() {
+  try { const s = await api("/api/state"); renderState(s);
+        if (selected == null && s.docs.length) selected = s.docs[0].id;
+        await renderDetail(); } catch (e) { if (e.message !== "login") console.warn(e); }
+}
+
+$("#upload").onclick = () => $("#file").click();
+$("#file").onchange = async e => {
+  for (const f of e.target.files) {
+    const r = await api("/api/upload", { method: "POST", headers: { "X-Filename": encodeURIComponent(f.name) }, body: f });
+    selected = r.id; lastDetail = "";
+  }
+  e.target.value = ""; tick();
+};
+$("#sync").onclick = async () => { const b = $("#sync"); b.disabled = true; b.textContent = "Syncing…";
+  try { const r = await api("/api/sync", { method: "POST" }); if (r.queued.length) selected = r.queued[0]; }
+  catch (e) { alert(e.message); } b.disabled = false; b.textContent = "Sync from Box"; lastDetail = ""; tick(); };
+$("#redteam").onclick = async () => { const r = await api("/api/redteam", { method: "POST" }); selected = r.id; lastDetail = ""; tick(); };
+
+tick(); setInterval(tick, 1500);
+</script>
+</body>
+</html>

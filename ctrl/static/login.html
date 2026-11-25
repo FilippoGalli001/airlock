@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Airlock · sign in</title>
+<style>
+  :root { --bg:#f6f5f1; --panel:#fff; --ink:#1d1c1a; --muted:#6b6862; --line:#e4e1d9; --accent:#2f6b4f; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#121311; --panel:#1b1c1a; --ink:#ecebe6; --muted:#9a978f; --line:#2c2d2a; --accent:#6fbf94; } }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; display:grid; place-items:center; background:var(--bg); color:var(--ink);
+         font:15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; padding:16px; }
+  form { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:28px; width:min(360px,100%); }
+  h1 { font-size:20px; margin:0 0 4px; letter-spacing:-.01em; }
+  p { color:var(--muted); margin:0 0 20px; font-size:14px; }
+  input { width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:transparent;
+          color:inherit; font:inherit; }
+  button { margin-top:12px; width:100%; padding:10px; border:0; border-radius:8px; background:var(--accent);
+           color:#fff; font:inherit; font-weight:600; cursor:pointer; }
+  .bad { color:#c0392b; font-size:13px; margin-top:10px; display:none; }
+</style>
+</head>
+<body>
+<form method="post" action="/login">
+  <h1>Airlock</h1>
+  <p>Untrusted documents in. Only what you approve comes out.</p>
+  <input type="password" name="password" placeholder="Password" autofocus required>
+  <button type="submit">Sign in</button>
+  <div class="bad" id="bad">Wrong password.</div>
+</form>
+<script>if (location.search.includes("bad")) document.getElementById("bad").style.display = "block";</script>
+</body>
+</html>

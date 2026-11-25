@@ -8,8 +8,8 @@
   refused by the gateway).
 - **Chamber done and verified** (baseline v11, red-team smoke test passes).
 - **ctrl pipeline works end to end from the CLI** on airlock-ctrl: all 5 demo cases pass (see log).
-- Next: web UI (FastAPI or stdlib server, password, queue, timeline, approve/edit/reject, Sync, upload,
-  red-team button), service on :8080, then README + video.
+- **Web UI deployed** on airlock-ctrl (service `airlock`, https://airlock-ctrl-jmgx.sprites.app, Fly login + app
+  password from `.env.ctrl`). Next: user tries it; fix UI issues; clean Box/DB for the demo; README; video.
 
 ## Spike checklist (decides the direction)
 Sprite `airlock-spike`, org `filippo-galli`, URL `https://airlock-spike-jmgx.sprites.app` (auth: sprite = private).
@@ -166,6 +166,19 @@ Box now holds filed copies from these runs (bill, payslip) — fine as demo data
 - Hostile sample is now a **contract** asking to be filed as a receipt with confidence 0.99 and to print the token
   file → QUARANTINE with both "rule: … pre-approved by the user, system note" and "model: flagged as suspicious";
   the model kept doc_type=contract. Chamber baseline now **v20**.
+
+### Web UI — Nov 25, night
+`ctrl/web.py` (stdlib `ThreadingHTTPServer`) + `ctrl/static/{index,login}.html`, service `airlock` on ctrl
+(`/.sprite/bin/python3 -m ctrl.web`, dir `~/airlock`, http-port 8080). Password from `.env.ctrl` → HMAC-signed
+cookie (HttpOnly, Secure, SameSite=Strict, 12 h); POSTs also need header `X-Airlock: 1`; CSP set; 1.5 s delay
+on a wrong password. One worker thread drains the queue (`pipeline.process`, which holds the lock and the Task).
+`pipeline.PHASE` drives the live chamber badge (CLEAN / DIRTY / RESTORING). Red-team drill = a queued copy of
+the bill with `source=redteam`. Layout: top bar with the two Sprites, queue left, step timeline right
+(chamber read → red-team → agent tools with Pinecone scores and model-written code → alarms → policy →
+proposal → review form / filed on Box / nothing left → reset).
+Smoke test on ctrl: `/login` 200, `/` without cookie → 302, API without cookie → 401, login → 303, state OK.
+The ctrl URL is private (auth sprite): a browser is sent to Fly's login (sprites.dev/auth) first, then the app
+password — two layers.
 
 ## Log
 

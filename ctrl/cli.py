@@ -51,7 +51,7 @@ def main():
     elif a.cmd == "sync":
         print("queued", pipeline.sync_box())
     elif a.cmd == "process":
-        pipeline.process(int(a.args[0]), redteam=a.redteam)
+        pipeline.process(int(a.args[0]), redteam=a.redteam or None)
         show(int(a.args[0]))
     elif a.cmd == "list":
         for d in db.documents():
