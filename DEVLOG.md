@@ -216,3 +216,16 @@ password — two layers.
   "Add a credit card to start using Sprites. $30 in free trial credit lands as soon as you do."
   (org `filippo-galli`). The "no credit card" / "free plan" claims on the marketing pages do not hold for this
   org. Blocked on the user adding a card.
+
+### UI rework after a design review — Nov 25, late night
+A subagent reviewed the page with real screenshots (mock server on exported live data, headless Chrome at
+1920x1080, 1440x900 and true 390 px mobile emulation) and reworked `ctrl/static/index.html` only:
+verdict card at the top of each document (headline, 6-stage strip Read · Agent · Alarms · Policy · Result · Reset
+with the live stage highlighted, reasons, key fields or alarms), review form inside the card, step-by-step
+timeline below with long content collapsed/clamped, red-team drill shown as a plain-English table (attempt →
+what the jail answered), one-line queue rows with consistent colours and a DRILL tag, larger chamber state
+badge, AA contrast tokens, keyboard focus, busy/error states on every action, "can't reach ctrl" banner,
+deep link `#doc=N`, US time format, light theme optimised for video (dark checked). Verified here: screenshots
+reviewed, `node --check` passes, every document-derived value goes through `esc()`.
+Lesson: the earlier blank page came from a literal newline inside a JS string; curl-only testing missed it.
+Always `node --check` the page script before deploying.
