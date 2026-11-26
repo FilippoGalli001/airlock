@@ -52,19 +52,20 @@ const Captions = ({ items }) => (
   <>
     {items.map((c, i) => (
       <Sequence key={i} from={sec(c.at)} durationInFrames={sec(c.dur)} layout="none">
-        <Caption text={c.text} tone={c.tone} dur={sec(c.dur)} />
+        <Caption text={c.text} tone={c.tone} pos={c.pos} dur={sec(c.dur)} />
       </Sequence>
     ))}
   </>
 );
 
-const Caption = ({ text, tone, dur }) => {
+const Caption = ({ text, tone, pos, dur }) => {
   const f = useCurrentFrame();
   const o = fade(f, dur);
-  const lift = interpolate(f, [0, 10], [14, 0], { extrapolateRight: "clamp", easing: ease });
+  const lift = interpolate(f, [0, 10], [pos === "top" ? -14 : 14, 0], { extrapolateRight: "clamp", easing: ease });
   const accent = tone === "red" ? RED : tone === "green" ? GREEN : "#9cc1f0";
   return (
-    <AbsoluteFill style={{ justifyContent: "flex-end", alignItems: "center", paddingBottom: 64, pointerEvents: "none" }}>
+    <AbsoluteFill style={{ justifyContent: pos === "top" ? "flex-start" : "flex-end", alignItems: "center",
+      paddingTop: 40, paddingBottom: 36, pointerEvents: "none" }}>
       <div style={{
         opacity: o, transform: `translateY(${lift}px)`, maxWidth: 1560, padding: "18px 34px", borderRadius: 18,
         background: "rgba(17,18,16,0.9)", color: INK, fontFamily, fontWeight: 600, fontSize: 46, lineHeight: 1.25,
@@ -102,7 +103,7 @@ const Hook = () => (
   <Card>
     <Appear at={0.2}><Wordmark /></Appear>
     <Appear at={0.6} style={{ fontSize: 84, fontWeight: 700, lineHeight: 1.08, whiteSpace: "nowrap" }}>Your documents can attack your AI.</Appear>
-    <Appear at={3.2} style={{ fontSize: 50, fontWeight: 400, marginTop: 40, color: "#cfcdc5", lineHeight: 1.3 }}>
+    <Appear at={2.4} style={{ fontSize: 50, fontWeight: 400, marginTop: 40, color: "#cfcdc5", lineHeight: 1.3 }}>
       Airlock opens them in a Fly.io Sprite <span style={{ color: GREEN, fontWeight: 600 }}>with no keys</span>,
       then <span style={{ color: GREEN, fontWeight: 600 }}>wipes it</span>.
     </Appear>
@@ -113,11 +114,12 @@ const Close = () => (
   <Card>
     <Appear at={0.2}><Wordmark /></Appear>
     <Appear at={0.5} style={{ fontSize: 70, fontWeight: 700, lineHeight: 1.15 }}>The AI proposes.</Appear>
-    <Appear at={1.3} style={{ fontSize: 70, fontWeight: 700, lineHeight: 1.15 }}>Code decides.</Appear>
-    <Appear at={2.1} style={{ fontSize: 70, fontWeight: 700, lineHeight: 1.15, color: GREEN }}>You approve what's risky.</Appear>
-    <Appear at={3.6} style={{ fontSize: 44, marginTop: 36, color: "#cfcdc5" }}>Every document gets a fresh Sprite.</Appear>
-    <Appear at={5.0} style={{ fontSize: 34, marginTop: 60, color: "#9c998f", lineHeight: 1.6 }}>
-      github.com/FilippoGalli001/airlock<br />Fly.io Sprites · Ollama · Box · Pinecone
+    <Appear at={1.0} style={{ fontSize: 70, fontWeight: 700, lineHeight: 1.15 }}>Code decides.</Appear>
+    <Appear at={1.5} style={{ fontSize: 70, fontWeight: 700, lineHeight: 1.15, color: GREEN }}>You approve what's risky.</Appear>
+    <Appear at={2.4} style={{ fontSize: 44, marginTop: 36, color: "#cfcdc5" }}>Every document gets a fresh Sprite.</Appear>
+    <Appear at={3.2} style={{ fontSize: 34, marginTop: 60, color: "#9c998f", lineHeight: 1.6 }}>
+      <span style={{ color: INK }}>Live demo: airlock-ctrl-jmgx.sprites.app</span><br />
+      Code: github.com/FilippoGalli001/airlock<br />Fly.io Sprites · Ollama · Box · Pinecone
     </Appear>
   </Card>
 );
@@ -132,10 +134,10 @@ const BoxCard = () => (
 
 // Each scene: segments of takes played in series, plus captions timed against the scene.
 const SCENES = [
-  { name: "hook", frames: sec(7.5), render: () => <Hook /> },
+  { name: "hook", frames: sec(5.8), render: () => <Hook /> },
 
   { name: "architecture", segs: [
-      seg("A", 0.4, 1.9, { rate: 0.15, zoom: [
+      seg("A", 1.3, 1.9, { rate: 0.06, zoom: [
         { t: 0, s: 1, x: 960, y: 540 }, { t: 1.2, s: 1.7, x: 640, y: 70 }, { t: 4.6, s: 1.7, x: 640, y: 70 },
         { t: 6.0, s: 1.7, x: 1500, y: 70 }, { t: 9.4, s: 1.7, x: 1500, y: 70 }, { t: 10, s: 1, x: 960, y: 540 }] }),
     ], captions: [
@@ -145,12 +147,11 @@ const SCENES = [
 
   { name: "bill", segs: [
       seg("A", 2.6, 21.2, { rate: 2.8 }),
-      seg("A", 29.8, 36.4, { zoom: [{ t: 0, s: 1, x: 960, y: 540 }, { t: 3.2, s: 1, x: 960, y: 540 },
-        { t: 4.2, s: 1.45, x: 1000, y: 1010 }] }),
+      seg("A", 29.6, 33.0, { zoom: [{ t: 0, s: 1, x: 960, y: 540 }, { t: 0.5, s: 1.7, x: 1500, y: 70 }] }),
     ], captions: [
       { at: 0.2, dur: 3.2, text: "A scanned bill, OCR'd inside the jail" },
       { at: 3.6, dur: 3.0, text: "The agent checks the math with code, in the jail" },
-      { at: 6.9, dur: 6.3, text: "Clean bill → filed on Box automatically. Chamber wiped.", tone: "green" },
+      { at: 6.9, dur: 3.1, text: "Clean bill → filed on Box automatically. Chamber wiped.", tone: "green" },
     ] },
 
   { name: "box", frames: sec(2.2), render: () => <BoxCard /> },
@@ -168,20 +169,22 @@ const SCENES = [
       seg("C", 2.8, 14.6, { rate: 1.7, zoom: [{ t: 0, s: 1, x: 960, y: 540 }, { t: 1.6, s: 1.35, x: 1300, y: 640 }] }),
       seg("C", 26.4, 28.4, { zoom: [{ t: 0, s: 1, x: 960, y: 540 }] }),
       seg("D", 2.8, 12.0, { rate: 3 }),
-      seg("D", 13.6, 18.4, { zoom: [{ t: 0, s: 1, x: 960, y: 540 }, { t: 0.8, s: 1.55, x: 1060, y: 560 }] }),
+      seg("D", 11.9, 14.2, { zoom: [{ t: 0, s: 1, x: 960, y: 540 }, { t: 0.6, s: 1.5, x: 1000, y: 690 }] }),
+      seg("D", 14.2, 18.4, { zoom: [{ t: 0, s: 1, x: 960, y: 540 }, { t: 0.8, s: 1.55, x: 1060, y: 560 }] }),
     ], captions: [
       { at: 0.2, dur: 3.4, text: "A paystub: SSN + bank account → you decide" },
       { at: 3.8, dur: 3.2, text: "You fix the issuer and say why" },
       { at: 7.2, dur: 2.0, text: "Approved → filed on Box, remembered in Pinecone", tone: "green" },
-      { at: 9.4, dur: 2.9, text: "Next month's paystub arrives…" },
-      { at: 12.5, dur: 4.6, text: "Your correction is applied automatically", tone: "green" },
+      { at: 9.4, dur: 2.5, text: "Next month's paystub arrives…" },
+      { at: 12.1, dur: 2.2, text: "The issuer is already written your way…", tone: "green" },
+      { at: 14.5, dur: 3.8, text: "…because Pinecone recalled your note (match 0.91)", tone: "green" },
     ] },
 
   { name: "contracts", segs: [
       seg("E", 2.6, 8.4, { zoom: [{ t: 0.3, s: 1, x: 960, y: 540 }, { t: 1.2, s: 1.35, x: 1160, y: 380 }] }),
       seg("E", 8.4, 13.0, { zoom: [{ t: 0, s: 1.35, x: 1160, y: 380 }] }),
     ], captions: [
-      { at: 0.2, dur: 5.5, text: "A contract telling the AI to file it as a receipt and leak a token → caught by a fixed rule and the model", tone: "red" },
+      { at: 0.2, dur: 5.5, text: "A contract hides orders for the AI → caught by a fixed rule and the model", tone: "red" },
       { at: 5.9, dur: 4.4, text: "Paraphrased: the rule misses it. The model doesn't.", tone: "red" },
     ] },
 
@@ -192,12 +195,12 @@ const SCENES = [
       seg("F", 13.4, 18.1, { zoom: [{ t: 0, s: 1.45, x: 1320, y: 1000 }, { t: 1.0, s: 1.9, x: 1540, y: 50 }] }),
     ], captions: [
       { at: 0.2, dur: 3.6, text: "Now assume the AI was fooled", tone: "red" },
-      { at: 4.0, dur: 3.2, text: "Hostile code runs in the chamber…" },
-      { at: 7.4, dur: 4.0, text: "No keys to steal. No network. The canary trips.", tone: "red" },
+      { at: 4.0, dur: 3.2, text: "Hostile code runs in the chamber…", pos: "top" },
+      { at: 7.4, dur: 4.0, text: "No keys to steal. No network. The canary trips.", tone: "red", pos: "top" },
       { at: 11.6, dur: 4.0, text: "Nothing leaves. The chamber is wiped clean.", tone: "green" },
     ] },
 
-  { name: "close", frames: sec(9), render: () => <Close /> },
+  { name: "close", frames: sec(7), render: () => <Close /> },
 ];
 
 const sceneFrames = s => s.frames ?? s.segs.reduce((a, g) => a + g.frames, 0);

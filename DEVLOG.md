@@ -336,3 +336,11 @@ a 1 s Box clip recorded by the user. Shot list: `video/shotlist.md`.
 - Edit: Remotion 4 (`video/remotion/*.jsx`), 1920x1080 30 fps, 2864 frames = 95.5 s. freezedetect: only the title
   card and the closing card hold still. Box clip placeholder until the user's recording arrives.
   Render: `cd video && npx remotion render remotion/index.jsx Airlock out/airlock-vN.mp4 --crf=18`.
+
+### 2026-11-26 — Video v3 (after Gemini's frame review)
+- Checked Gemini's five points on real frames of v2: all confirmed.
+- Fixes in `video/remotion/Airlock.jsx`: captions can sit at the top (`pos: "top"`) and do so over the red-team
+  table; lower caption padding; bill ends on a zoom of the CLEAN badge instead of code that was off-screen;
+  review shows the pre-filled issuer before the Pinecone match; architecture uses a still stretch of take A
+  (no page jump mid-pan); hook 5.8 s, close 7 s with the live demo URL; shorter contract caption.
+- `video/out/airlock-v3.mp4`: 90.3 s. Box scene is still the placeholder card.
