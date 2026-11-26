@@ -2,7 +2,7 @@
 
 **A personal agent that files your bills, paystubs and contracts, and never lets the AI near your keys.**
 
-> ▶ **[Watch the 90-second demo](#)** · 🔍 **[Explore the live Sprite](https://airlock-ctrl-jmgx.sprites.app)**: every real run, with
+> ▶ **[Watch the 90-second demo](https://x.com/fgalli2001/status/2126016738789605400)** · 🔍 **[Explore the live Sprite](https://airlock-ctrl-jmgx.sprites.app)**: every real run, with
 > the Python the model wrote, the Pinecone matches, the canary alarms and the checkpoint restores.
 > **Click "Red-team drill"** to watch hostile code trip the canary and the chamber restore itself, live (no sign-in;
 > the drill never reaches the model, Box or Pinecone). Uploads and reviews stay password-locked.
