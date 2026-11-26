@@ -18,6 +18,7 @@ from .memory import Memory
 from .policy import Alarms
 
 CHAMBER_LOCK = threading.Lock()
+DRILL_LOCK = threading.Lock()
 # what the chamber is doing right now, for the UI: idle | extract | agent | reset
 PHASE = {"step": "idle", "doc": None, "since": time.time()}
 
@@ -107,6 +108,28 @@ def intake(name, data, source="upload", box_file_id=None):
     return doc_id
 
 
+def start_drill():
+    """Queue a red-team drill: one at a time, and only the latest finished one is kept.
+    Returns (doc_id, started): started is False when a drill was already running."""
+    with DRILL_LOCK:
+        running = db.active_drill()
+        if running:
+            return running, False
+        doc_id = _queue_drill()
+    for old in db.prune_drills(doc_id):
+        for ext in EXT_OK:
+            try:
+                os.remove(os.path.join(FILES, f"{old}.{ext}"))
+            except FileNotFoundError:
+                pass
+    return doc_id, True
+
+
+def _queue_drill():
+    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "samples", "electric-bill-oct.pdf"), "rb") as f:
+        return intake("red-team-drill.pdf", f.read(), source="redteam")
+
+
 def sync_box(box=None):
     """Queue files in Airlock/Inbox that were not seen before. Returns new document ids."""
     box = box or Box()
@@ -139,7 +162,11 @@ def process(doc_id, redteam=None, chamber=None, memory=None, box=None):
         except ChamberUnavailable as e:
             HALT.update(halted=True, why=str(e))
             log("chamber_unavailable", error=str(e))
-            db.update(doc_id, status="queued")   # retried once the chamber is clean again
+            if redteam:   # a drill is not retried: nothing ran, and the next click checks the chamber again
+                db.update(doc_id, status="quarantined", decision={
+                    "action": policy.QUARANTINE, "reasons": ["the chamber did not answer; nothing ran"]})
+            else:
+                db.update(doc_id, status="queued")   # retried once the chamber is clean again
             return db.get(doc_id)
         db.update(doc_id, status="processing")
         try:
@@ -162,7 +189,8 @@ def process(doc_id, redteam=None, chamber=None, memory=None, box=None):
 
             merge_alarms(alarms, check=chamber.check())
             proposal = None
-            if not (alarms.canary_read or alarms.canary_in_output) and text.strip():
+            # a drill never reaches the model (so never Ollama, Box or Pinecone), whatever the jail did
+            if not redteam and not (alarms.canary_read or alarms.canary_in_output) and text.strip():
                 phase("agent", doc_id)
                 try:
                     proposal = agent.run(text, chamber, memory, alarms, events, budget_ok=db.spend_llm_call)

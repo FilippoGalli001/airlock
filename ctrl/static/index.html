@@ -247,7 +247,7 @@
   /* public read-only view */
   .signin { display:none; text-decoration:none; }
   body.readonly .signin { display:inline-flex; align-items:center; }
-  body.readonly #upload, body.readonly #sync, body.readonly #redteam,
+  body.readonly #upload, body.readonly #sync,
   body.readonly form.review button { display:none; }
   body.readonly form.review input, body.readonly form.review select, body.readonly form.review textarea { pointer-events:none; opacity:.7; }
 </style>
@@ -721,7 +721,8 @@ $("#sync").onclick = async () => {
 };
 $("#redteam").onclick = async () => {
   const done = busy($("#redteam"), "Starting drill…"); qerr();
-  try { const r = await api("/api/redteam", { method: "POST" }); select(r.id); }
+  try { const r = await api("/api/redteam", { method: "POST" }); select(r.id);
+        if (r.already_running) qerr("A drill is already running: watch it live.", true); }
   catch (e) { qerr("Drill failed: " + e.message); }
   done();
 };

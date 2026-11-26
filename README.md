@@ -2,9 +2,10 @@
 
 **A personal agent that files your bills, paystubs and contracts, and never lets the AI near your keys.**
 
-> ▶ **[Watch the 90-second demo](#)** · 🔍 **[Explore the live, read-only Sprite](https://airlock-ctrl-jmgx.sprites.app)**: every real run, with
-> the Python the model wrote, the Pinecone matches, the canary alarms and the checkpoint restores. Actions stay
-> password-locked.
+> ▶ **[Watch the 90-second demo](#)** · 🔍 **[Explore the live Sprite](https://airlock-ctrl-jmgx.sprites.app)**: every real run, with
+> the Python the model wrote, the Pinecone matches, the canary alarms and the checkpoint restores.
+> **Click "Red-team drill"** to watch hostile code trip the canary and the chamber restore itself, live (no sign-in;
+> the drill never reaches the model, Box or Pinecone). Uploads and reviews stay password-locked.
 
 Untrusted documents are opened, OCR'd and analyzed inside a disposable, egress-locked
 [Fly.io Sprite](https://sprites.dev) that holds **no credentials** and is **restored to a clean checkpoint
@@ -56,7 +57,7 @@ Two things we learned building it, which shaped the design:
 3. **Alarms.** Decoy credentials sit in the jail. Reading one moves its atime, and the jail can't undo that (the
    files are root-owned). Red means a canary was touched. Yellow means the jail blocked something, a job timed
    out, or the PDF has active content.
-4. **Policy** (`ctrl/policy.py`; 45 tests across the suite). **AUTO** only for clean bills and receipts with
+4. **Policy** (`ctrl/policy.py`; 50 tests across the suite). **AUTO** only for clean bills and receipts with
    confidence ≥ 0.85. **APPROVAL** for paystubs, contracts, SSNs, bank or card numbers, IBANs, totals that don't
    add up, or partially read documents. **QUARANTINE** for any alarm, injection phrases, or the model's own
    suspicion.
@@ -97,7 +98,7 @@ You need a Fly.io org with Sprites, and the `sprite` CLI.
    `python scripts/fork_check.py`.
 4. `bash scripts/deploy-ctrl.sh`. Then on ctrl run `cd ~/airlock && python3 -m ctrl.cli setup` and
    `sprite-env services create airlock --cmd /.sprite/bin/python3 --args -m,ctrl.web --dir /home/sprite/airlock --http-port 8080`.
-   The UI password is in `.env.ctrl`. `bash scripts/public-demo.sh on` opens a read-only view.
+   The UI password is in `.env.ctrl`. `bash scripts/public-demo.sh on` opens a public view (look + red-team drill).
 5. Tests: `python -m unittest discover -s tests -t .`
 
 ## Known limits

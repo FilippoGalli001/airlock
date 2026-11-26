@@ -1,7 +1,8 @@
 """Airlock web UI and API on ctrl (standard library only). Service on :8080 behind the Sprite URL.
 
 Every route except /login needs the password cookie. POSTs also need the X-Airlock header (CSRF), and the
-cookie is SameSite=Strict. One background thread processes queued documents, one at a time.
+cookie is SameSite=Strict. In public read-only mode anyone can look, and anyone can start a red-team drill
+(no model call, no Box, no Pinecone; one at a time; PUBLIC_DRILLS_PER_HOUR); everything else needs the password. One background thread processes queued documents, one at a time.
 """
 import hashlib
 import hmac
@@ -20,6 +21,19 @@ SESSION_SECRET = hashlib.sha256(("airlock-session|" + config.UI_PASSWORD).encode
 SESSION_HOURS = 12
 WAKE = threading.Event()
 STARTED = time.time()
+PUBLIC_DRILLS_PER_HOUR = 12
+_public_drills = []          # start times of drills started without the password
+_drill_rate = threading.Lock()
+
+
+def public_drill_allowed():
+    with _drill_rate:
+        now = time.time()
+        _public_drills[:] = [t for t in _public_drills if now - t < 3600]
+        if len(_public_drills) >= PUBLIC_DRILLS_PER_HOUR:
+            return False
+        _public_drills.append(now)
+        return True
 
 
 def sign(expiry):
@@ -136,7 +150,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(303, b"", extra={"Location": "/", "Set-Cookie": cookie})
             time.sleep(1.5)
             return self._send(303, b"", extra={"Location": "/login?bad=1"})
-        if not self._authed() or self.headers.get("X-Airlock") != "1":
+        if self.headers.get("X-Airlock") != "1":
+            return self._send(401, {"error": "login required"})
+        authed = self._authed()
+        if path == "/api/redteam" and (authed or config.PUBLIC_READONLY):
+            return self._drill(authed)
+        if not authed:
             return self._send(401, {"error": "login required"})
         try:
             if path == "/api/upload":
@@ -148,11 +167,6 @@ class Handler(BaseHTTPRequestHandler):
                 ids = pipeline.sync_box()
                 WAKE.set()
                 return self._send(200, {"queued": ids})
-            if path == "/api/redteam":
-                with open(os.path.join(HERE, "..", "samples", "electric-bill-oct.pdf"), "rb") as f:
-                    doc_id = pipeline.intake("red-team-drill.pdf", f.read(), source="redteam")
-                WAKE.set()
-                return self._send(200, {"id": doc_id})
             if path.startswith("/api/doc/") and path.endswith(("/approve", "/reject")):
                 part = path.split("/")[3]
                 if not part.isdigit():
@@ -172,6 +186,16 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:  # noqa: BLE001 — Box/Pinecone errors: report, don't drop the connection
             return self._send(502, {"error": f"{type(e).__name__}: {str(e)[:200]}"})
         self._send(404, {"error": "not found"})
+
+    def _drill(self, authed):
+        running = db.active_drill()
+        if running:
+            return self._send(200, {"id": running, "already_running": True})
+        if not authed and not public_drill_allowed():
+            return self._send(429, {"error": "a lot of drills this hour; please try again later"})
+        doc_id, started = pipeline.start_drill()
+        WAKE.set()
+        return self._send(200, {"id": doc_id, "already_running": not started})
 
     def log_message(self, fmt, *args):
         pass

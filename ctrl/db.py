@@ -90,6 +90,27 @@ def documents(limit=100):
         return [_row(r) for r in db().execute("SELECT * FROM documents ORDER BY id DESC LIMIT ?", (limit,)).fetchall()]
 
 
+def active_drill():
+    """The id of a red-team drill that is queued or running, else None."""
+    with _lock:
+        r = db().execute("SELECT id FROM documents WHERE source='redteam' AND status IN ('queued','processing')"
+                         " ORDER BY id LIMIT 1").fetchone()
+    return r[0] if r else None
+
+
+def prune_drills(keep_id):
+    """Delete every finished red-team drill except keep_id, so public drills never push real documents
+    off the queue. Returns the deleted ids (the caller removes their files)."""
+    with _lock, db():
+        ids = [r[0] for r in db().execute(
+            "SELECT id FROM documents WHERE source='redteam' AND id != ? AND status NOT IN ('queued','processing')",
+            (keep_id,))]
+        for i in ids:
+            db().execute("DELETE FROM events WHERE document_id=?", (i,))
+            db().execute("DELETE FROM documents WHERE id=?", (i,))
+    return ids
+
+
 def next_queued():
     with _lock:
         r = db().execute("SELECT id FROM documents WHERE status='queued' ORDER BY id LIMIT 1").fetchone()

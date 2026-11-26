@@ -65,7 +65,7 @@ chamber from pause in ~0.3 s. No Sprites token lives on either VM.
 
 | File | Role |
 |---|---|
-| `web.py` | UI + JSON API; one worker thread drains the queue; password cookie (HMAC, HttpOnly, Secure, SameSite=Strict) + `X-Airlock: 1` on POSTs; optional public read-only mode (`AIRLOCK_PUBLIC_READONLY=1`: anyone can look, every action needs the password) |
+| `web.py` | UI + JSON API; one worker thread drains the queue; password cookie (HMAC, HttpOnly, Secure, SameSite=Strict) + `X-Airlock: 1` on POSTs; optional public read-only mode (`AIRLOCK_PUBLIC_READONLY=1`: anyone can look and start a red-team drill, which never reaches the model, Box or Pinecone, one at a time, 12 per hour, only the latest kept; every other action needs the password) |
 | `pipeline.py` | one document at a time (lock); holds a Sprites Task so ctrl doesn't pause mid-document; fail-closed chamber check; reset in `finally`; reviews |
 | `agent.py` | Ollama tool loop (OpenAI-compatible API) |
 | `policy.py` | the rules: AUTO / APPROVAL / QUARANTINE |
