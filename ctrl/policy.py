@@ -137,7 +137,9 @@ def sensitive_data(text):
 
 
 def injection_markers(text):
-    return sorted({m.group(0).lower() for m in INJECTION_RE.finditer(text or "")})
+    found = {" ".join(m.group(0).lower().split()) for m in INJECTION_RE.finditer(text or "")}
+    # report what was meant, not the OCR's reading ("Al assistant" -> "ai assistant")
+    return sorted(re.sub(r"^a[l1] assistant$", "ai assistant", f) for f in found)
 
 
 def decide(proposal, alarms, text, canary=""):

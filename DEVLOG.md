@@ -320,3 +320,19 @@ Not done: Weird Uncle angle (agreed it doesn't fit).
   319.50: off by 30.00"). README screenshots retaken at 1280 px (red-team hero, review, invoice with the code open).
 - Risk to watch: if cold starts fail for any chamber with deny-all egress, chamber-2 will fail the same way after
   going cold. Check it after a long idle period before recording and before submitting.
+- **Resolved**: chamber-2, cold with egress deny-all, woke on a `/health` request in **0.33 s**. The network policy
+  is not the cause; chamber-1 is wedged on Fly's side (matches reports of Sprites stuck cold on an unhealthy host:
+  502 after ~40 s, `last_running_at: null`). chamber-1 stays cold; to be destroyed after the contest.
+
+### Video — Nov 26
+Plan agreed with the user: captions only (no voice), real footage driven by Playwright, Remotion around it,
+a 1 s Box clip recorded by the user. Shot list: `video/shotlist.md`.
+- Recording: `video/record.mjs` (Playwright 1.65, clean Chromium, 1536x864 + injected cursor, one take per scene,
+  marks in JSON) through `sprite proxy`; test takes used Box root `Airlock Test` so `Airlock` stayed clean.
+  Final takes A–F recorded after reset-demo + 3 preloaded docs. Take D first failed: it waited for "Needs your
+  review", already on screen for another doc. Worse, the paystub's memory search ("paystub earnings statement
+  net pay", no issuer) scored below 0.84 and found nothing → prompt now requires type + issuer in the query;
+  the re-take found the note at 0.91. Also fixed: OCR "Al assistant" now reported as "ai assistant".
+- Edit: Remotion 4 (`video/remotion/*.jsx`), 1920x1080 30 fps, 2864 frames = 95.5 s. freezedetect: only the title
+  card and the closing card hold still. Box clip placeholder until the user's recording arrives.
+  Render: `cd video && npx remotion render remotion/index.jsx Airlock out/airlock-vN.mp4 --crf=18`.
