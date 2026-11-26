@@ -285,3 +285,22 @@ Not done: Weird Uncle angle (agreed it doesn't fit).
 - Queue: time only for today, date otherwise; column 440 px, so full file names fit.
 - `scripts/public-demo.sh on|off`: toggles `AIRLOCK_PUBLIC_READONLY` in `.env.ctrl`, redeploys, and sets the ctrl
   URL auth to public/sprite. Plan: turn it on just before submitting (the form asks for a demo link).
+
+### README pass from Gemini's judge read — Nov 26
+- UI: ctrl role label "holds the keys" → "calls the connectors · never opens a file" (keys live in the gateway);
+  totals shown with 2 decimals in the review form; agent's note shows 3 lines; stage strip stays on one line at
+  ≤1440 px. README rewritten: red-team hero image, video/live callout, diagram ≤ 80 chars (69), one restore figure
+  (~5–8 s), no misquotes, "analyzed", "sleep when idle", outcomes grouped, Box no-delete as a guarantee,
+  Pinecone integrated embeddings + poisoning rules, "~1,700 lines of dependency-free Python".
+- Screenshots retaken at 1280x800 for red-team/review/invoice (in scratchpad); NOT yet copied to docs/, because
+  the demo set must be re-run (invoice still shows the pre-Decimal output) and that is blocked by the issue below.
+
+### Incident: chamber-1 does not start from cold — Nov 26
+- After ~1 h idle chamber-1 went **cold**. Every request since: worker `/health` → 502 after ~42 s; `sprite exec`
+  → `failed to connect ... i/o timeout`. airlock-spike and airlock-ctrl start fine. Sprites API record:
+  status cold, `last_running_at: null`. Fly status page: no Sprites incident in the last 24 h.
+- The fail-closed check worked as designed: 8 queued docs got `chamber_unavailable`, none was processed.
+- Hypothesis (unverified): chamber had only ever woken from *warm* pause; a cold boot with egress
+  `{"domain":"*","action":"deny"}` may block something the boot needs (storage is object-storage backed,
+  `SPRITE_STORAGE_DRIVER=sbd`). Docs say nothing either way. Testing it means opening chamber egress briefly;
+  the auto-mode permission check refused that, so it waits for the user's decision.

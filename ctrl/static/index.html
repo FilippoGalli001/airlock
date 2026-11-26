@@ -201,7 +201,7 @@
   .kv { display:grid; grid-template-columns:max-content minmax(0,1fr); gap:3px 14px; margin-top:6px; font-size:14px; }
   .kv dt { color:var(--muted); }
   .kv dd { margin:0; overflow-wrap:anywhere; }
-  .clamp { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:var(--lines, 2); overflow:hidden; }
+  .clamp { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:var(--lines, 3); overflow:hidden; }
   .clamp.open { display:block; -webkit-line-clamp:unset; }
   pre.clip { max-height:9.6em; overflow:hidden; position:relative; }
   pre.clip.open { max-height:none; }
@@ -239,6 +239,11 @@
     .doc { grid-template-columns:4px minmax(0,1fr) auto; }
     .doc .tm { display:none; }
   }
+  /* medium screens (e.g. a 1280 px recording): keep each stage on one line */
+  @media (max-width: 1440px) {
+    .pipe .vl { font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .pipe .lb { font-size:11px; }
+  }
   /* public read-only view */
   .signin { display:none; text-decoration:none; }
   body.readonly .signin { display:inline-flex; align-items:center; }
@@ -254,7 +259,7 @@
     <div><b>Airlock</b><small>personal quarantine agent</small></div>
   </div>
   <div class="sprite">
-    <div class="sp-top"><span class="name">airlock-ctrl</span><span class="role">holds the keys · never runs untrusted code</span></div>
+    <div class="sp-top"><span class="name">airlock-ctrl</span><span class="role">calls the connectors · never opens a file</span></div>
     <div class="sp-chips"><span class="chip green">Ollama</span><span class="chip green">Box</span><span class="chip green">Pinecone</span></div>
   </div>
   <div class="link" aria-hidden="true"><span>sends jobs</span>
@@ -309,6 +314,7 @@ const clock = t => { if (!t) return ""; const d = new Date(t * 1000), now = new 
 const qclock = t => { if (!t) return ""; const d = new Date(t * 1000);
   return d.toDateString() === new Date().toDateString() ? d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
     : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }); };
+const cents = v => v == null || v === "" || isNaN(+v) ? "" : (+v).toFixed(2);   // 319.5 -> "319.50"
 const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
 let selected = null, lastDetail = "", lastQueue = "", phase = {}, openKeys = { doc: null, keys: new Set() };
 
@@ -609,10 +615,10 @@ function reviewForm(p) {
       <label>Type<select name="doc_type" data-orig="${esc(p.doc_type)}">${types.map(t => `<option ${t === p.doc_type ? "selected" : ""}>${t}</option>`).join("")}</select></label>
       <label>Issuer<input name="issuer" value="${esc(p.issuer)}" data-orig="${esc(p.issuer)}"></label>
       <label>Date<input name="date" value="${esc(p.date)}" data-orig="${esc(p.date)}" placeholder="YYYY-MM-DD"></label>
-      <label>Total<input name="total" value="${esc(p.total ?? "")}" data-orig="${esc(p.total ?? "")}" inputmode="decimal"></label>
+      <label>Total<input name="total" value="${esc(cents(p.total))}" data-orig="${esc(cents(p.total))}" inputmode="decimal"></label>
       <label>Currency<input name="currency" value="${cur}" data-orig="${cur}" maxlength="3"></label>
     </div>
-    ${p.reason ? `<div class="hint"><b style="color:var(--ink);font-weight:600">Agent's note:</b> ${clampText(esc(p.reason), String(p.reason).length, 1, 130)}</div>` : ""}
+    ${p.reason ? `<div class="hint"><b style="color:var(--ink);font-weight:600">Agent's note:</b> ${clampText(esc(p.reason), String(p.reason).length, 3, 420)}</div>` : ""}
     <label>Note for the agent (required if you change something or reject)<textarea name="note" placeholder="Why? The agent will remember this next time."></textarea></label>
     <div class="rrow"><button class="btn ok" name="approve" type="submit">Approve and file on Box</button>
       <button class="btn danger" name="reject" type="button">Reject</button>
