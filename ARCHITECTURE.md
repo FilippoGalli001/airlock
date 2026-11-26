@@ -12,7 +12,7 @@ This file describes the code as it is. Measured numbers come from runs logged in
                  └──┬──────────────┬──────────────┬───────────────────┬───────────────────┘
                     │ gateway      │ gateway      │ gateway           │ HTTPS + X-Airlock-Key
                     ▼              ▼              ▼                   ▼
-                 Ollama          Box          Pinecone      ┌──────── chamber-1 (Sprite) ─────────┐
+                 Ollama          Box          Pinecone      ┌──────── chamber-2 (Sprite) ─────────┐
                  deepseek-       Inbox in,    memory of     │ no connector grants, egress: deny * │
                  v4.1-flash      Trusted out  your reviews  │ chamber/worker.py (root, :8080)     │
                                                             │  /health /extract /run /check /reset│
@@ -24,11 +24,11 @@ This file describes the code as it is. Measured numbers come from runs logged in
 **Why two Sprites.** The connector gateway authenticates the *whole Sprite*, not a process, and
 `/.sprite/api.sock` (checkpoint/restore) is world-writable inside a Sprite. Any code on airlock-ctrl could use
 Box, Pinecone and Ollama. So untrusted content — parsing a PDF as much as running model-written code — never
-touches ctrl. chamber-1 has no connector grants (connector access policies match the name prefix
+touches ctrl. chamber-2 has no connector grants (connector access policies match the name prefix
 `airlock-ctrl`) and an egress policy of `{"domain":"*","action":"deny"}`: DNS, the gateway and raw IPs all fail.
 
 **Why not drive the chamber through the Sprites API.** We tried a Custom API connector pointing at
-`api.sprites.dev/v1/sprites/chamber-1`; the gateway refuses it by design (`403 blocked: base URL targets the
+`api.sprites.dev/v1/sprites/chamber-2`; the gateway refuses it by design (`403 blocked: base URL targets the
 Sprites API itself`). Instead the chamber runs a small trusted worker on its own Sprite URL, authenticated with
 a shared key. Inbound requests come through the Fly proxy, so they work with egress denied, and they wake the
 chamber from pause in ~0.3 s. No Sprites token lives on either VM.

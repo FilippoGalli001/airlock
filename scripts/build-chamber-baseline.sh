@@ -6,7 +6,7 @@ export MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")/.."
 SPRITE="${SPRITE_BIN:-sprite}"
 command -v "$SPRITE" >/dev/null 2>&1 || SPRITE="$LOCALAPPDATA/Programs/Sprite/sprite.exe"
-CH="${CHAMBER:-chamber-1}"
+CH="${CHAMBER:-chamber-2}"
 ENVF=.env.chamber
 
 if [ ! -f "$ENVF" ]; then

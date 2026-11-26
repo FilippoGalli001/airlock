@@ -24,7 +24,7 @@ An agent that files into your Box should not run that input next to your credent
 | Sprite feature | How Airlock uses it |
 |---|---|
 | **Connectors** (keys stay in the gateway) | `airlock-ctrl` calls Ollama, Box and Pinecone through the gateway; no provider key is on any VM |
-| **Hardware-isolated VM + egress policy** | `chamber-1` has *no* connector grants and `deny *` egress: no DNS, no gateway, no raw IPs |
+| **Hardware-isolated VM + egress policy** | `chamber-2` has *no* connector grants and `deny *` egress: no DNS, no gateway, no raw IPs |
 | **Checkpoints** | the chamber is restored to its baseline after every document (~5–8 s, worker back included) |
 | **Sprite URLs** | ctrl drives the chamber through a key-protected worker on the chamber's URL; inbound works with egress denied and wakes it in ~0.3 s |
 | **Sleep and Tasks** | both Sprites sleep when idle; ctrl holds a Task while a document is in flight |
@@ -39,7 +39,7 @@ Two things we learned building it, which shaped the design:
 ## What happens to a document
 
 ```
- airlock-ctrl                          chamber-1 (no keys, no egress)
+ airlock-ctrl                          chamber-2 (no keys, no egress)
  ─────────────                         ──────────────────────────────
  upload / Box Inbox ──── document ───► parse + OCR in a jail
  agent (Ollama) ◄──────── text ─────── 
@@ -91,7 +91,7 @@ You need a Fly.io org with Sprites, and the `sprite` CLI.
 1. In the Fly dashboard (Sprites → Connectors), add **Ollama**, **Box** and **Pinecone** and restrict each to the
    name prefix `airlock-ctrl`. Put their gateway URLs in `ctrl/config.py`, or in `AIRLOCK_OLLAMA`,
    `AIRLOCK_BOX` and `AIRLOCK_PINECONE`.
-2. `sprite create airlock-ctrl && sprite create chamber-1`
+2. `sprite create airlock-ctrl && sprite create chamber-2`
 3. `bash scripts/build-chamber-baseline.sh` builds the jail, canaries and worker, denies egress, and
    checkpoints; it writes `.env.chamber`. Check it with `python scripts/chamber_smoke.py` and
    `python scripts/fork_check.py`.

@@ -63,7 +63,8 @@ def state():
     return {
         "docs": [summary(d) for d in db.documents(60)],
         "phase": pipeline.PHASE,
-        "chamber": {"baseline": config.CHAMBER_BASELINE, "egress": "deny all", "connectors": 0},
+        "chamber": {"name": urllib.parse.urlparse(config.CHAMBER_URL).hostname.rsplit("-", 1)[0] if config.CHAMBER_URL else "",
+                    "baseline": config.CHAMBER_BASELINE, "egress": "deny all", "connectors": 0},
         "ctrl": {"connectors": ["Ollama", "Box", "Pinecone"], "model": config.MODEL},
         "budget": {"llm_calls": db.today_llm_calls(), "cap": config.DAILY_LLM_CALLS},
         "halt": pipeline.HALT,

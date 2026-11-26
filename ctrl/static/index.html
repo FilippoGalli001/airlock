@@ -266,7 +266,7 @@
     <svg viewBox="0 0 88 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 6h84M79 1l6 5-6 5"/></svg>
     <span>key-authed HTTPS</span></div>
   <div class="sprite">
-    <div class="sp-top"><span class="name">chamber-1</span><span class="role">runs untrusted work, jailed</span></div>
+    <div class="sp-top"><span class="name" id="chname">chamber</span><span class="role">runs untrusted work, jailed</span></div>
     <div class="sp-chips"><span class="chip">0 connectors</span><span class="chip red">egress: deny all</span><span class="chip" id="baseline">baseline —</span></div>
     <div class="state green" id="chamber" role="status" title="Live state of the chamber"><span class="dot"></span><span>CLEAN</span></div>
   </div>
@@ -293,7 +293,7 @@
   <section class="panel detail" id="detail" aria-live="polite">
     <div class="empty">
       <div style="font-weight:600;color:var(--ink);font-size:17px;margin-bottom:6px">Upload a document, or pick one from the list.</div>
-      Each document is read inside chamber-1, checked by the agent and the chamber alarms, then fixed rules decide:
+      Each document is read inside the chamber, checked by the agent and the chamber alarms, then fixed rules decide:
       <b style="color:var(--green)">filed on Box</b>, <b style="color:var(--amber)">sent to you for review</b>, or
       <b style="color:var(--red)">quarantined</b>. The chamber is reset to a clean checkpoint after every document.
     </div>
@@ -348,6 +348,7 @@ function renderState(s) {
   h.hidden = !(s.halt && s.halt.halted);
   if (!h.hidden) h.textContent = `Queue paused: ${s.halt.why}. No document enters a chamber that isn't clean. Retrying…`;
   $("#baseline").textContent = "baseline " + (s.chamber.baseline || "—");
+  if (s.chamber.name) $("#chname").textContent = s.chamber.name;
   phase = s.phase || {};
   const ch = $("#chamber");
   const map = { idle: ["CLEAN", "", "green"], extract: ["DIRTY", `reading #${phase.doc}`, "amber pulse"],
@@ -453,7 +454,7 @@ function verdictCard(d, f) {
   const red = (pol?.reasons || []).some(r => String(r).startsWith("RED"));
   let cls, icon, title, sub, links = "";
   const live = d.status === "processing" && phase.doc === d.id ? phase.step : null;
-  if (d.status === "queued") { cls = "blue"; icon = ICON.dots; title = "Waiting for the chamber"; sub = "Documents go through chamber-1 one at a time."; }
+  if (d.status === "queued") { cls = "blue"; icon = ICON.dots; title = "Waiting for the chamber"; sub = "Documents go through the chamber one at a time."; }
   else if (d.status === "processing") { cls = "blue"; icon = ICON.dots;
     title = { extract: "Chamber is reading the document", agent: "Agent is working, inside the airlock", reset: "Restoring the chamber" }[live] || "In the airlock";
     sub = "Live. This page updates by itself."; }
@@ -507,7 +508,7 @@ function timeline(d, f) {
   const ex = f.ex;
   if (ex) out.push(step(ex.chars ? "ok" : "warn", "1", "Chamber read the document",
     `${ex.method === "ocr" ? "OCR" : esc(ex.method)} · ${esc(ex.chars)} chars · ${secs(ex.ms)}`,
-    `<span class="hint">Parsed inside the jail on chamber-1, never on airlock-ctrl.</span>
+    `<span class="hint">Parsed inside the jail in the chamber, never on airlock-ctrl.</span>
      ${det("Show the extracted text (untrusted)", clipPre(ex.text))}`));
 
   for (const r of f.rts) out.push(step("bad", "!", "Red-team drill: pretend the agent was fooled", secs(r.ms),

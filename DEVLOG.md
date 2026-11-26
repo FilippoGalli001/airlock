@@ -1,11 +1,13 @@
 # DEVLOG
 
 ## Current status
-- Working end to end on two Sprites (airlock-ctrl + chamber-1, baseline v47); UI live at
-  https://airlock-ctrl-jmgx.sprites.app (Fly login + app password; public read-only mode available).
-- README.md and ARCHITECTURE.md match the code. 44 tests.
-- Next: clean demo state (reset-demo + Box Trusted by hand), real screenshots for the README, video (via a
-  skill), social post, submission. User still to delete the unused Custom API connector + revoke its token.
+- Working end to end on airlock-ctrl + **chamber-2** (baseline v2). chamber-1 is stuck "cold" (see the incident
+  log) and is no longer used. UI: https://airlock-ctrl-jmgx.sprites.app (Fly login + app password; public
+  read-only via `scripts/public-demo.sh on`).
+- README (judge pass done) and ARCHITECTURE match the code. 44 tests. Demo set loaded (8 docs).
+- Next: check chamber-2 still starts after going cold; video (via a skill); `public-demo.sh on`; video + live
+  links in the README; social post; submission. User: delete the unused Custom API connector + revoke its token;
+  empty Box `Airlock/Trusted/*` before recording.
 
 ## Spike checklist (decides the direction)
 Sprite `airlock-spike`, org `filippo-galli`, URL `https://airlock-spike-jmgx.sprites.app` (auth: sprite = private).
@@ -304,3 +306,17 @@ Not done: Weird Uncle angle (agreed it doesn't fit).
   `{"domain":"*","action":"deny"}` may block something the boot needs (storage is object-storage backed,
   `SPRITE_STORAGE_DRIVER=sbd`). Docs say nothing either way. Testing it means opening chamber egress briefly;
   the auto-mode permission check refused that, so it waits for the user's decision.
+- Follow-up: with the user's authorization I POSTed an allow-all policy to chamber-1 to test the hypothesis, then
+  deny-all again. Both calls returned an empty body (a warm chamber answers with the policy JSON), and the chamber
+  still didn't start → the policy API seems to go through the VM, so the change most likely never applied.
+  **Inconclusive**; the egress policy is presumably still deny-all, to be checked if chamber-1 ever starts.
+  The Fly "Timeouts querying app logs" incident that day concerned log queries only.
+- Decision: don't wait. Built **chamber-2** with the same script (egress open only during setup): baseline **v2**,
+  egress verified closed (pypi and the gateway both fail with exit 6), smoke test, symlink attack, red team and
+  fork check all pass, resets 6.7–7.3 s. `.env.chamber` now points to chamber-2; the chamber-1 version is kept as
+  `.env.chamber.chamber-1.bak` (gitignored). chamber-1 is left as is for diagnosis.
+- The UI now reads the chamber's name from the config (header showed a hard-coded "chamber-1").
+- Demo set rebuilt on chamber-2: same outcomes as before; the agent now uses Decimal ("items 289.50 vs total
+  319.50: off by 30.00"). README screenshots retaken at 1280 px (red-team hero, review, invoice with the code open).
+- Risk to watch: if cold starts fail for any chamber with deny-all egress, chamber-2 will fail the same way after
+  going cold. Check it after a long idle period before recording and before submitting.
