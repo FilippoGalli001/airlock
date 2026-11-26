@@ -2,7 +2,7 @@
 // Times are in seconds of the source take; see public/takes/*.json for the marks they came from.
 import React from "react";
 import {
-  AbsoluteFill, OffthreadVideo, Sequence, Series, interpolate, staticFile, useCurrentFrame, Easing,
+  AbsoluteFill, Img, OffthreadVideo, Sequence, Series, interpolate, staticFile, useCurrentFrame, Easing,
 } from "remotion";
 import { loadFont } from "@remotion/google-fonts/Inter";
 
@@ -124,13 +124,20 @@ const Close = () => (
   </Card>
 );
 
-const BoxCard = () => (
-  <Card>
-    <Appear at={0.1} style={{ fontSize: 40, color: "#9c998f", marginBottom: 20 }}>Box · Airlock / Trusted / Bills</Appear>
-    <Appear at={0.3} style={{ fontSize: 56, fontWeight: 600 }}>electric-bill-oct.pdf</Appear>
-    <Appear at={0.5} style={{ fontSize: 56, fontWeight: 600, color: GREEN }}>electric-bill-oct.airlock.json</Appear>
-  </Card>
-);
+// A real screenshot of the Box folder (names only: account details cropped out), with a slow push-in.
+const BoxShot = () => {
+  const f = useCurrentFrame();
+  const z = interpolate(f, [0, sec(3.2)], [1, 1.06], { extrapolateRight: "clamp" });
+  return (
+    <AbsoluteFill style={{ background: "#f5f4ef", justifyContent: "center", alignItems: "center" }}>
+      <div style={{ transform: `scale(${z})`, opacity: fade(f, sec(3.2), 8, 6), background: "#fff", borderRadius: 22,
+        padding: "34px 44px", boxShadow: "0 20px 60px rgba(0,0,0,.12)", marginBottom: 150 }}>
+        <Img src={staticFile("box-files.png")} style={{ width: 1515, display: "block" }} />
+      </div>
+      <Captions items={[{ at: 0.2, dur: 2.9, text: "Really on Box: the PDF and its .airlock.json record", tone: "green" }]} />
+    </AbsoluteFill>
+  );
+};
 
 // Each scene: segments of takes played in series, plus captions timed against the scene.
 const SCENES = [
@@ -154,7 +161,7 @@ const SCENES = [
       { at: 6.9, dur: 3.1, text: "Clean bill → filed on Box automatically. Chamber wiped.", tone: "green" },
     ] },
 
-  { name: "box", frames: sec(2.2), render: () => <BoxCard /> },
+  { name: "box", frames: sec(3.2), render: () => <BoxShot /> },
 
   { name: "invoice", segs: [
       seg("B", 2.8, 13.4, { rate: 3 }),

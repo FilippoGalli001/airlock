@@ -344,3 +344,5 @@ a 1 s Box clip recorded by the user. Shot list: `video/shotlist.md`.
   review shows the pre-filled issuer before the Pinecone match; architecture uses a still stretch of take A
   (no page jump mid-pan); hook 5.8 s, close 7 s with the live demo URL; shorter contract caption.
 - `video/out/airlock-v3.mp4`: 90.3 s. Box scene is still the placeholder card.
+- v4: the Box scene is now a real screenshot of `Airlock/Trusted/Bills` (`video/public/box-files.png`, cropped
+  to the file names; the uncropped `box.png` shows the account name and stays gitignored). 91.3 s.
