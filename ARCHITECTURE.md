@@ -1,6 +1,6 @@
 # Airlock — Architecture
 
-This file describes the code as it is. Measured numbers come from runs logged in `DEVLOG.md`.
+This file describes the code as it is. Measured numbers come from real runs on the two Sprites.
 
 ## Two Sprites
 

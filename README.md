@@ -108,4 +108,4 @@ You need a Fly.io org with Sprites, and the `sprite` CLI.
 - bwrap shares the chamber's kernel.
 - Only the first 10 pages are read; longer documents go to a person.
 
-Full threat model: [ARCHITECTURE.md](ARCHITECTURE.md). Build log: [DEVLOG.md](DEVLOG.md).
+Full threat model: [ARCHITECTURE.md](ARCHITECTURE.md).

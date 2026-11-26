@@ -17,7 +17,7 @@ The AI proposes, the code decides, people approve what is risky.
 
 ## Files
 - `CLAUDE.md` — this file: goal, rules, current status. Keep it short.
-- `DEVLOG.md` — dated log of what was done, verified, decided, and open questions. Append, don't rewrite.
+- `DEVLOG.md` — local only (gitignored): dated log of what was done, verified, decided. Append, don't rewrite.
 - `ARCHITECTURE.md` — written once the spike settles the direction (not before).
 
 ## Rules for working here
