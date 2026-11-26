@@ -2,7 +2,7 @@
 
 **A personal agent that files your bills, paystubs and contracts, and never lets the AI near your keys.**
 
-> ▶ **[Watch the 90-second demo](#)** · 🔍 **[Explore the live, read-only Sprite](#)**: every real run, with
+> ▶ **[Watch the 90-second demo](#)** · 🔍 **[Explore the live, read-only Sprite](https://airlock-ctrl-jmgx.sprites.app)**: every real run, with
 > the Python the model wrote, the Pinecone matches, the canary alarms and the checkpoint restores. Actions stay
 > password-locked.
 
@@ -56,7 +56,7 @@ Two things we learned building it, which shaped the design:
 3. **Alarms.** Decoy credentials sit in the jail. Reading one moves its atime, and the jail can't undo that (the
    files are root-owned). Red means a canary was touched. Yellow means the jail blocked something, a job timed
    out, or the PDF has active content.
-4. **Policy** (`ctrl/policy.py`; 44 tests across the suite). **AUTO** only for clean bills and receipts with
+4. **Policy** (`ctrl/policy.py`; 45 tests across the suite). **AUTO** only for clean bills and receipts with
    confidence ≥ 0.85. **APPROVAL** for paystubs, contracts, SSNs, bank or card numbers, IBANs, totals that don't
    add up, or partially read documents. **QUARANTINE** for any alarm, injection phrases, or the model's own
    suspicion.

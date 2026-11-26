@@ -346,3 +346,11 @@ a 1 s Box clip recorded by the user. Shot list: `video/shotlist.md`.
 - `video/out/airlock-v3.mp4`: 90.3 s. Box scene is still the placeholder card.
 - v4: the Box scene is now a real screenshot of `Airlock/Trusted/Bills` (`video/public/box-files.png`, cropped
   to the file names; the uncropped `box.png` shows the account name and stays gitignored). 91.3 s.
+
+### 2026-11-26 — Ready to submit
+- Live demo now has all 8 README cases: added #8 `receipt-with-javascript.pdf` → QUARANTINE on the active-content
+  rule (the model itself did not flag it: the fixed rule caught it).
+- Public read-only mode ON (`scripts/public-demo.sh on`): GET / and /api/state answer 200 without login; every
+  POST (upload, sync, red-team, approve/reject) answers 401.
+- README links the live Sprite. Video link still to add once posted on X / YouTube.
+- `video/out/airlock-final.mp4`: v4 re-encoded yuv420p + faststart for X.
